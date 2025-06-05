@@ -11,3 +11,101 @@ alwaysApply: false
 - You should use Next.js as it works best with Vercel. 
 - This frontend will ultimately be deployed on Vercel, but it should be possible to test locally. 
 - Always provide users with a way to run the created UI once you have created it.
+
+#### Visual Design & UX
+- You must pay attention to visual clarity and contrast. Do not place white text on a white background.
+- You must ensure the UX is pleasant. Boxes should grow to fit their contents, etc.
+- Use consistent spacing and typography throughout the application
+- Implement proper visual hierarchy with appropriate font sizes, weights, and colors
+- Ensure interactive elements have clear hover and focus states
+- Use loading states and skeleton screens for better perceived performance
+- Implement proper error states with clear, actionable error messages
+- Follow the principle of progressive disclosure - show only what's necessary at each step
+
+#### Security & Privacy
+- When asking the user for sensitive information - you must use password style text-entry boxes in the UI
+- Never expose sensitive data in client-side code or URLs
+- Implement proper form validation on both client and server sides
+- Use HTTPS for all production deployments
+- Sanitize user inputs to prevent XSS attacks
+
+#### Framework & Architecture
+- You should use Next.js as it works best with Vercel
+- Use App Router for new projects (Next.js 13+)
+- Implement proper SEO with metadata API
+- Use Server Components by default, Client Components only when necessary
+- Follow the principle of server-first rendering for better performance
+
+#### Performance & Optimization
+- Optimize images using Next.js Image component with proper sizing and formats
+- Implement code splitting and lazy loading for better bundle sizes
+- Use React.memo() and useMemo() judiciously to prevent unnecessary re-renders
+- Minimize client-side JavaScript bundle size
+- Implement proper caching strategies for static and dynamic content
+
+#### Accessibility
+- Ensure all interactive elements are keyboard accessible
+- Use semantic HTML elements (nav, main, section, article, etc.)
+- Provide proper alt text for images and aria-labels for complex UI elements
+- Maintain proper color contrast ratios (WCAG AA compliance)
+- Implement focus management for modals and dynamic content
+- Use proper heading hierarchy (h1, h2, h3, etc.)
+
+#### Responsive Design
+- Design mobile-first, then enhance for larger screens
+- Use CSS Grid and Flexbox for layout instead of floats
+- Implement proper breakpoints for different device sizes
+- Ensure touch targets are at least 44px for mobile devices
+- Test on various screen sizes and orientations
+
+#### Code Quality & Maintainability
+- Use TypeScript for better type safety and developer experience
+- Follow consistent naming conventions (camelCase for variables, PascalCase for components)
+- Keep components small and focused on a single responsibility
+- Use custom hooks to extract and reuse stateful logic
+- Implement proper error boundaries to handle React errors gracefully
+- Write meaningful commit messages and maintain clean git history
+
+#### Styling & UI Components
+- Use Tailwind CSS for utility-first styling approach
+- Leverage shadcn/ui components for consistent design system
+- Avoid inline styles; prefer CSS classes or CSS-in-JS solutions
+- Implement dark mode support when appropriate
+- Use CSS custom properties for theme variables
+- Ensure consistent component spacing using design tokens
+
+#### Data Management
+- Use React Query or SWR for server state management
+- Implement proper loading and error states for async operations
+- Use Zustand or Context API for client-side state management
+- Avoid prop drilling; use composition patterns instead
+- Implement optimistic updates for better user experience
+
+#### Testing & Quality Assurance
+- Write unit tests for utility functions and custom hooks
+- Implement integration tests for critical user flows
+- Use React Testing Library for component testing
+- Test accessibility with automated tools and manual testing
+- Perform cross-browser testing on major browsers
+
+#### Deployment & Environment
+- This frontend will ultimately be deployed on Vercel, but it should be possible to test locally
+- Always provide users with a way to run the created UI once you have created it
+- Use environment variables for configuration (never hardcode API keys)
+- Implement proper CI/CD pipelines with automated testing
+- Set up proper monitoring and error tracking (Sentry, LogRocket, etc.)
+- Use feature flags for gradual rollouts of new features
+
+#### Documentation & Communication
+- Include clear README with setup instructions and project overview
+- Document complex components and business logic
+- Use JSDoc comments for function and component documentation
+- Maintain a changelog for version tracking
+- Include examples and usage patterns for reusable components
+
+#### Browser Support & Compatibility
+- Support modern browsers (Chrome, Firefox, Safari, Edge)
+- Use progressive enhancement for advanced features
+- Implement proper polyfills when necessary
+- Test on both desktop and mobile browsers
+- Gracefully degrade features for older browsers when required

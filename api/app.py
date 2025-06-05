@@ -27,7 +27,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     developer_message: str  # Message from the developer/system
     user_message: str      # Message from the user
-    model: Optional[str] = "gpt-4.1-mini"  # Optional model selection with default
+    model: Optional[str] = "gpt-3.5-turbo"  # Optional model selection with default
     api_key: str          # OpenAI API key for authentication
 
 # Define the main chat endpoint that handles POST requests
