@@ -41,6 +41,7 @@ import ListItemAvatar from '@mui/material/ListItemAvatar';
 import Chip from '@mui/material/Chip';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { AppBar, Toolbar, CssBaseline, Container, Menu } from '@mui/material';
+import { useSessionContext } from './SessionContext';
 
 interface Message {
   text: string;
@@ -70,9 +71,21 @@ function parseSessions(raw: any): { id: string; name: string; messages: Message[
 }
 
 export default function ChatPage() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>('');
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Use SessionContext for all session/message management
+  const {
+    sessions,
+    currentSessionId,
+    addMessageToCurrentSession,
+    handleSwitchSession,
+    handleNewSession,
+    handleDeleteSession
+  } = useSessionContext();
+
+  // Find the current session and its messages
+  const currentSession = sessions.find(s => s.id === currentSessionId);
+  const messages = currentSession ? currentSession.messages : [];
+
+  // Local state for chat functionality
   const [input, setInput] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('gpt-4o-mini');
@@ -112,33 +125,15 @@ export default function ChatPage() {
     },
   ];
 
-  // Load sessions from localStorage
-  useEffect(() => {
-    const savedSessions = localStorage.getItem('chatSessions');
-    if (savedSessions) {
-      const parsedSessions = parseSessions(savedSessions);
-      setSessions(parsedSessions);
-      if (parsedSessions.length > 0) {
-        setCurrentSessionId(parsedSessions[0].id);
-        setMessages(parsedSessions[0].messages);
-      }
-    } else {
-      // Create initial session
-      const initialSession = { 
-        id: Date.now().toString(), 
-        name: 'Session ' + new Date().toLocaleString(), 
-        messages: [{ text: "Hello! How can I assist you today?", sender: 'bot' as 'bot' }] 
-      };
-      setSessions([initialSession]);
-      setCurrentSessionId(initialSession.id);
-      setMessages(initialSession.messages);
-    }
-  }, []);
-
   // Load API key from localStorage
   useEffect(() => {
     const savedApiKey = localStorage.getItem('openai_api_key');
-    if (savedApiKey) {
+    const savedUserApiKey = localStorage.getItem('user_openai_api_key');
+    const savedUseOwnKey = localStorage.getItem('use_own_api_key');
+    
+    if (savedUseOwnKey === 'true' && savedUserApiKey) {
+      setApiKey(savedUserApiKey);
+    } else if (savedApiKey) {
       setApiKey(savedApiKey);
     }
   }, []);
@@ -149,116 +144,6 @@ export default function ChatPage() {
       localStorage.setItem('openai_api_key', apiKey);
     }
   }, [apiKey]);
-
-  // Save sessions to localStorage
-  useEffect(() => {
-    if (sessions.length > 0) {
-      localStorage.setItem('chatSessions', JSON.stringify(sessions));
-    }
-  }, [sessions]);
-
-  // Switch between sessions
-  const handleSwitchSession = (id: string) => {
-    setCurrentSessionId(id);
-    const session = sessions.find(s => s.id === id);
-    if (session) {
-      setMessages(session.messages);
-    }
-  };
-
-  // Start new session
-  const handleNewSession = () => {
-    const newId = Date.now().toString();
-    const newSession = { id: newId, name: 'Session ' + new Date().toLocaleString(), messages: [{ text: "Hello! How can I assist you today?", sender: 'bot' as 'bot' }] };
-    setSessions([newSession, ...sessions]);
-    setCurrentSessionId(newId);
-    setMessages(newSession.messages);
-  };
-
-  // Handle template selection
-  const handleTemplateSelect = (templateName: string) => {
-    const template = systemPromptTemplates.find(t => t.name === templateName);
-    if (template) {
-      setSystemPrompt(template.prompt);
-      setSelectedTemplate(templateName);
-    }
-  };
-
-  // Handle custom system prompt change
-  const handleSystemPromptChange = (value: string) => {
-    setSystemPrompt(value);
-    setSelectedTemplate(''); // Clear template selection when user types custom prompt
-  };
-
-  const handleSend = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!input.trim() || !apiKey || !backendHealthy) return;
-
-    const userMessage = input.trim();
-    setInput('');
-
-    // Add user message to chat
-    const newUserMessage: Message = { text: userMessage, sender: 'user' };
-    const updatedMessages = [...messages, newUserMessage];
-    setMessages(updatedMessages);
-
-    // Update current session
-    const updatedSessions = sessions.map(session =>
-      session.id === currentSessionId
-        ? { ...session, messages: updatedMessages }
-        : session
-    );
-    setSessions(updatedSessions);
-
-    try {
-      const response = await axios.post(`${getApiUrl()}/chat`, {
-        system_prompt: systemPrompt,
-        user_message: userMessage,
-        model: model,
-        api_key: apiKey
-      });
-
-      let botText = '';
-      if (typeof response.data === 'string') {
-        botText = response.data;
-      } else if (response.data && typeof response.data.detail === 'string') {
-        botText = response.data.detail;
-      } else {
-        botText = 'Sorry, there was an unexpected response from the server.';
-      }
-      const botMessage: Message = { text: botText, sender: 'bot' };
-      const finalMessages = [...updatedMessages, botMessage];
-      setMessages(finalMessages);
-
-      // Update session with bot response
-      const finalSessions = sessions.map(session =>
-        session.id === currentSessionId
-          ? { ...session, messages: finalMessages }
-          : session
-      );
-      setSessions(finalSessions);
-
-    } catch (error: any) {
-      let errorText = 'Sorry, there was an error processing your request. Please try again.';
-      if (error.response && error.response.data && typeof error.response.data.detail === 'string') {
-        errorText = error.response.data.detail;
-      }
-      const errorMessage: Message = { 
-        text: errorText, 
-        sender: 'bot' 
-      };
-      const errorMessages = [...updatedMessages, errorMessage];
-      setMessages(errorMessages);
-
-      // Update session with error message
-      const errorSessions = sessions.map(session =>
-        session.id === currentSessionId
-          ? { ...session, messages: errorMessages }
-          : session
-      );
-      setSessions(errorSessions);
-    }
-  };
 
   // Check backend health
   useEffect(() => {
@@ -280,18 +165,40 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [healthChecked]);
 
-  // Delete session
-  const handleDeleteSession = (sessionId: string) => {
-    const updatedSessions = sessions.filter(session => session.id !== sessionId);
-    setSessions(updatedSessions);
-    
-    // If we're deleting the current session, switch to the first available session
-    if (sessionId === currentSessionId && updatedSessions.length > 0) {
-      setCurrentSessionId(updatedSessions[0].id);
-      setMessages(updatedSessions[0].messages);
-    } else if (updatedSessions.length === 0) {
-      // If no sessions left, create a new one
-      handleNewSession();
+  // Handle sending a message
+  const handleSend = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!input.trim() || !apiKey || !backendHealthy) return;
+
+    const userMessage = input.trim();
+    setInput('');
+
+    // Add user message to current session via context
+    addMessageToCurrentSession({ text: userMessage, sender: 'user' });
+
+    try {
+      const response = await axios.post(`${getApiUrl()}/chat`, {
+        system_prompt: systemPrompt,
+        user_message: userMessage,
+        model: model,
+        api_key: apiKey
+      });
+
+      let botText = '';
+      if (typeof response.data === 'string') {
+        botText = response.data;
+      } else if (response.data && typeof response.data.detail === 'string') {
+        botText = response.data.detail;
+      } else {
+        botText = 'Sorry, there was an unexpected response from the server.';
+      }
+      addMessageToCurrentSession({ text: botText, sender: 'bot' });
+    } catch (error: any) {
+      let errorText = 'Sorry, there was an error processing your request. Please try again.';
+      if (error.response && error.response.data && typeof error.response.data.detail === 'string') {
+        errorText = error.response.data.detail;
+      }
+      addMessageToCurrentSession({ text: errorText, sender: 'bot' });
     }
   };
 
@@ -355,7 +262,7 @@ export default function ChatPage() {
         </Box>
       </Paper>
       {/* Input box - always at the bottom */}
-      <Box component="form" onSubmit={handleSend} sx={{ width: '100%', display: 'flex', alignItems: 'center', p: 1, background: 'rgba(255,255,255,0.98)', borderRadius: 0, borderTop: '1px solid #ececec', boxShadow: 1, gap: 1 }}>
+      <Box component="form" onSubmit={handleSend} sx={{ width: '100%', display: 'flex', alignItems: 'center', p: 1.5, background: 'rgba(255,255,255,0.98)', borderRadius: 0, borderTop: '1px solid #ececec', boxShadow: 1, gap: 1, minHeight: 90 }}>
         <TextField
           label="Type your message"
           placeholder="Ask me anything..."
@@ -364,7 +271,9 @@ export default function ChatPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={!backendHealthy || !apiKey}
-          sx={{ background: !backendHealthy || !apiKey ? '#f8d7da' : 'white', borderRadius: 2, transition: 'background 0.3s' }}
+          multiline
+          rows={3}
+          sx={{ background: !backendHealthy || !apiKey ? '#f8d7da' : 'white', borderRadius: 2, transition: 'background 0.3s', minHeight: 70 }}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
@@ -383,7 +292,7 @@ export default function ChatPage() {
           type="submit"
           color="primary"
           disabled={!backendHealthy || !apiKey || !input.trim()}
-          sx={{ fontWeight: 700, borderRadius: 2, boxShadow: 2, minWidth: 80, height: 40 }}
+          sx={{ fontWeight: 700, borderRadius: 2, boxShadow: 2, minWidth: 80, height: 56 }}
           aria-label="Send message"
         >
           Send
@@ -392,6 +301,11 @@ export default function ChatPage() {
       {!backendHealthy && (
         <Typography color="error" variant="caption" sx={{ mt: 1, ml: 1 }}>
           Backend is unreachable. Please ensure the backend server is running.
+        </Typography>
+      )}
+      {!apiKey && (
+        <Typography color="warning.main" variant="caption" sx={{ mt: 1, ml: 1 }}>
+          Please enter your OpenAI API key in the sidebar to enable chat.
         </Typography>
       )}
     </Box>

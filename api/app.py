@@ -42,6 +42,9 @@ async def chat(request: ChatRequest):
         # Add system prompt
         if request.system_prompt:
             messages.append({"role": "system", "content": request.system_prompt})
+        else:
+            # Default system prompt for better formatting
+            messages.append({"role": "system", "content": "You are a helpful AI assistant. When providing mathematical explanations, use clear, readable text format rather than LaTeX notation. For example, write '3 packs' instead of mathematical notation. Keep responses conversational and easy to understand."})
         
         # Add user message
         messages.append({"role": "user", "content": request.user_message})
