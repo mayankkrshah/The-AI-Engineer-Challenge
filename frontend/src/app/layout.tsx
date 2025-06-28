@@ -161,7 +161,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
       width: 380,
       minWidth: 300,
       maxWidth: 420,
-      background: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+      background: '#f7f8fa',
       color: '#222',
       position: 'relative',
       overflow: 'hidden',
@@ -171,6 +171,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
       zIndex: 1,
       padding: 0,
       margin: 0,
+      borderRight: '1px solid #e5e7eb',
+      boxShadow: '2px 0 8px 0 rgba(0,0,0,0.04)',
     }}>
       {/* New Chat Button at the top */}
       <div style={{ padding: '1.2rem 1.2rem 0.5rem 1.2rem' }}>
@@ -179,26 +181,24 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
           fullWidth
           onClick={handleNewSession}
           style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: '#2563eb',
             color: '#fff',
             fontWeight: 600,
             fontSize: '0.95rem',
             padding: '12px 24px',
             borderRadius: '12px',
             textTransform: 'none',
-            boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)',
             transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
+            e.currentTarget.style.background = '#1d4ed8';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+            e.currentTarget.style.background = '#2563eb';
           }}
         >
-          ✨ New Chat
+          New Chat
         </Button>
       </div>
 
@@ -208,21 +208,21 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         overflowY: 'auto', 
         padding: '0 1.2rem 1.2rem 1.2rem',
         scrollbarWidth: 'thin',
-        scrollbarColor: 'rgba(255,255,255,0.3) transparent'
+        scrollbarColor: 'rgba(0,0,0,0.08) transparent'
       }}>
         {sessions.map((session) => (
           <div
             key={session.id}
             style={{
               background: session.id === currentSessionId 
-                ? 'linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(245, 158, 66, 0.2) 100%)'
+                ? '#e8eaf0'
                 : 'transparent',
               borderRadius: '12px',
               padding: '12px 16px',
               marginBottom: '8px',
               cursor: 'pointer',
               border: session.id === currentSessionId 
-                ? '1px solid rgba(124, 58, 237, 0.3)'
+                ? '1px solid #2563eb'
                 : '1px solid transparent',
               transition: 'all 0.3s ease',
               position: 'relative',
@@ -236,7 +236,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                 <div style={{ 
                   fontSize: '0.9rem', 
                   fontWeight: 600, 
-                  color: '#222',
+                  color: '#1a202c',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
@@ -245,7 +245,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                 </div>
                 <div style={{ 
                   fontSize: '0.75rem', 
-                  color: 'rgba(34,34,34,0.7)',
+                  color: '#6b7280',
                   marginTop: '4px'
                 }}>
                   {session.messages.length} messages
@@ -262,7 +262,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                       setMenuSessionId(session.id);
                     }}
                     style={{ 
-                      color: 'rgba(34,34,34,0.7)',
+                      color: '#6b7280',
                       padding: '4px'
                     }}
                   >
@@ -275,11 +275,11 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                     onClose={() => setMenuAnchorEl(null)}
                     sx={{
                       '& .MuiPaper-root': {
-                        backgroundColor: 'rgba(35, 37, 38, 0.95)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255,255,255,0.1)',
+                        backgroundColor: '#fff',
+                        border: '1px solid #e5e7eb',
                         borderRadius: '12px',
-                        color: '#fff',
+                        color: '#222',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                       },
                     }}
                   >
@@ -288,7 +288,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                         if (menuSessionId) handleDeleteSession(menuSessionId);
                         setMenuAnchorEl(null);
                       }}
-                      style={{ color: '#ff6b6b' }}
+                      style={{ color: '#dc2626' }}
                       title={sessions.length === 1 ? "Delete this session and create a new fresh one" : "Delete this session"}
                     >
                       Delete Session
@@ -304,19 +304,19 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
       {/* Settings Section */}
       <div style={{
         padding: '1.2rem',
-        borderTop: '1px solid #b47ac7',
-        background: 'linear-gradient(135deg, #a259c4 0%, #ffb347 100%)',
-        boxShadow: '0 -2px 16px 0 rgba(162, 89, 196, 0.12)',
+        borderTop: '1px solid #e5e7eb',
+        background: '#f7f8fa',
+        boxShadow: '0 -1px 3px 0 rgba(0, 0, 0, 0.04)',
         borderBottomLeftRadius: '18px',
         borderBottomRightRadius: '18px',
-        color: '#222',
+        color: '#374151',
         minHeight: '220px',
       }}>
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ 
             fontSize: '0.95rem',
-            fontWeight: 700,
-            color: '#333',
+            fontWeight: 600,
+            color: '#111827',
             marginBottom: '8px',
             display: 'flex',
             alignItems: 'center',
@@ -330,14 +330,15 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
             fullWidth
             onClick={() => setSettingsOpen(true)}
             sx={{
-              color: '#a259c4',
-              borderColor: '#a259c4',
-              borderRadius: '8px',
+              color: '#374151',
+              borderColor: '#d1d5db',
+              borderRadius: '6px',
               textTransform: 'none',
-              fontWeight: 600,
+              fontWeight: 500,
               '&:hover': {
-                borderColor: '#ffb347',
-                color: '#ffb347',
+                borderColor: '#9ca3af',
+                color: '#111827',
+                backgroundColor: '#f9fafb',
               }
             }}
           >
@@ -348,8 +349,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ 
             fontSize: '0.95rem',
-            fontWeight: 700,
-            color: '#333',
+            fontWeight: 600,
+            color: '#111827',
             marginBottom: '8px',
             display: 'flex',
             alignItems: 'center',
@@ -363,17 +364,17 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
               value={model}
               onChange={(e) => setModel(e.target.value)}
               sx={{
-                backgroundColor: '#fff',
-                borderRadius: '4px',
-                color: '#222',
+                backgroundColor: '#ffffff',
+                borderRadius: '6px',
+                color: '#374151',
                 '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#b47ac7',
+                  borderColor: '#d1d5db',
                 },
                 '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#ffb347',
+                  borderColor: '#9ca3af',
                 },
                 '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#a259c4',
+                  borderColor: '#3b82f6',
                 },
               }}
             >
@@ -387,8 +388,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ 
             fontSize: '0.95rem',
-            fontWeight: 700,
-            color: '#333',
+            fontWeight: 600,
+            color: '#111827',
             marginBottom: '8px'
           }}>
             Temperature: {temperature}
@@ -400,18 +401,18 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
             max={2}
             step={0.1}
             sx={{
-              color: '#a259c4',
+              color: '#3b82f6',
               '& .MuiSlider-thumb': {
-                backgroundColor: '#fff',
-                border: '2px solid #ffb347',
+                backgroundColor: '#ffffff',
+                border: '2px solid #3b82f6',
                 borderRadius: '4px',
               },
               '& .MuiSlider-track': {
-                backgroundColor: '#ffb347',
+                backgroundColor: '#3b82f6',
                 borderRadius: '4px',
               },
               '& .MuiSlider-rail': {
-                backgroundColor: '#b47ac7',
+                backgroundColor: '#e5e7eb',
                 borderRadius: '4px',
               },
             }}
@@ -421,8 +422,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ 
             fontSize: '0.95rem',
-            fontWeight: 700,
-            color: '#333',
+            fontWeight: 600,
+            color: '#111827',
             marginBottom: '8px'
           }}>
             System Prompt Template
@@ -432,17 +433,17 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
               value={selectedTemplate}
               onChange={(e) => handleTemplateSelect(e.target.value)}
               sx={{
-                backgroundColor: '#fff',
-                borderRadius: '4px',
-                color: '#222',
+                backgroundColor: '#ffffff',
+                borderRadius: '6px',
+                color: '#374151',
                 '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#b47ac7',
+                  borderColor: '#d1d5db',
                 },
                 '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#ffb347',
+                  borderColor: '#9ca3af',
                 },
                 '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#a259c4',
+                  borderColor: '#3b82f6',
                 },
               }}
             >
@@ -464,23 +465,23 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
           size="small"
           fullWidth
           sx={{
-            backgroundColor: '#fff',
-            borderRadius: '4px',
+            backgroundColor: '#ffffff',
+            borderRadius: '6px',
             input: {
-              color: '#222',
+              color: '#374151',
               '::placeholder': {
-                color: '#888',
+                color: '#9ca3af',
                 opacity: 1,
               },
             },
             '& fieldset': {
-              borderColor: '#b47ac7',
+              borderColor: '#d1d5db',
             },
             '&:hover fieldset': {
-              borderColor: '#ffb347',
+              borderColor: '#9ca3af',
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#a259c4',
+              borderColor: '#3b82f6',
             },
           }}
         />
@@ -489,10 +490,10 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
           <div style={{
             marginTop: '1rem',
             padding: '8px 12px',
-            backgroundColor: 'rgba(244, 67, 54, 0.2)',
-            borderRadius: '8px',
-            border: '1px solid rgba(244, 67, 54, 0.3)',
-            color: '#ffcdd2',
+            backgroundColor: '#fef2f2',
+            borderRadius: '6px',
+            border: '1px solid #fecaca',
+            color: '#dc2626',
             fontSize: '0.8rem'
           }}>
             ⚠️ Backend connection failed
@@ -514,27 +515,29 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         disableEscapeKeyDown={!props.apiKey.startsWith('sk-')}
         PaperProps={{
           sx: {
-            background: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+            background: '#f7f8fa',
             borderRadius: '16px',
-            border: '1px solid rgba(255,255,255,0.2)',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
           }
         }}
       >
         <DialogTitle sx={{ 
           fontWeight: 700,
           textAlign: 'center',
-          background: 'linear-gradient(135deg, #a259c4 0%, #ffb347 100%)',
-          color: '#fff',
+          background: '#f7f8fa',
+          color: '#1a202c',
           borderRadius: '16px 16px 0 0',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          fontSize: '1.2rem',
         }}>
-          🚀 Welcome to AI Chat!
+          Welcome to AI Chat
           {props.apiKey.startsWith('sk-') && (
             <IconButton
               onClick={handleSettingsClose}
-              sx={{ color: '#fff' }}
+              sx={{ color: '#6b7280' }}
               size="small"
             >
               ✕
@@ -544,7 +547,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         
         <DialogContent sx={{ p: 3 }}>
           <Box sx={{ mb: 3 }}>
-            <Typography variant="body1" sx={{ mb: 2, color: '#222', fontWeight: 500 }}>
+            <Typography variant="body1" sx={{ mb: 2, color: '#374151', fontWeight: 500 }}>
               To get started, you need an OpenAI API key.
             </Typography>
           </Box>
@@ -562,13 +565,13 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
               borderRadius: '8px',
               '& .MuiOutlinedInput-root': {
                 '& fieldset': {
-                  borderColor: '#b47ac7',
+                  borderColor: '#e5e7eb',
                 },
                 '&:hover fieldset': {
-                  borderColor: '#ffb347',
+                  borderColor: '#2563eb',
                 },
                 '&.Mui-focused fieldset': {
-                  borderColor: '#a259c4',
+                  borderColor: '#2563eb',
                 },
               },
             }}
@@ -587,15 +590,19 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
             variant="contained"
             disabled={!props.apiKey.startsWith('sk-')}
             sx={{
-              background: 'linear-gradient(135deg, #a259c4 0%, #ffb347 100%)',
+              background: '#2563eb',
               color: '#fff',
               fontWeight: 600,
               px: 3,
               py: 1,
               borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)',
+              '&:hover': {
+                background: '#1d4ed8',
+              },
             }}
           >
-            Start Chatting!
+            Start Chatting
           </Button>
         </DialogActions>
       </Dialog>
@@ -622,7 +629,13 @@ export default function RootLayout(props: { children: React.ReactNode }) {
           })};`}
         </Script>
       </head>
-      <body className={inter.className} style={{ background: 'linear-gradient(120deg, #a18cd1 0%, #fbc2eb 100%)', minHeight: '100vh', minWidth: '100vw', margin: 0, padding: 0 }}>
+      <body className={inter.className} style={{ 
+        background: '#f7f8fa',
+        minHeight: '100vh', 
+        minWidth: '100vw', 
+        margin: 0, 
+        padding: 0 
+      }}>
         <ThemeProvider theme={theme}>
           <SessionProvider>
             <CssBaseline />
@@ -633,10 +646,10 @@ export default function RootLayout(props: { children: React.ReactNode }) {
                 flex: 1, 
                 display: 'flex', 
                 flexDirection: 'column',
-                background: 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(10px)',
+                background: '#fff',
                 borderRadius: '0 0 0 24px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: 'none',
               }}>
                 {props.children}
               </main>
