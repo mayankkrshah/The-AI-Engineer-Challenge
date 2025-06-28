@@ -38,11 +38,14 @@ export const useSessionContext = () => {
   return ctx;
 };
 
+const defaultPrompt = 'You are a knowledgeable, helpful, and friendly AI assistant. Provide clear, accurate, and well-structured responses. Always be concise yet comprehensive, use examples when helpful, and maintain a warm, professional tone. If you\'re unsure about something, acknowledge the limitation and suggest alternatives.';
+const defaultTemplate = '🧑‍💼 General Assistant';
+
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState('');
-  const [systemPrompt, setSystemPrompt] = useState('You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.');
-  const [selectedTemplate, setSelectedTemplate] = useState('General Assistant');
+  const [systemPrompt, setSystemPrompt] = useState<string>(defaultPrompt);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(defaultTemplate);
 
   // Load sessions from localStorage on mount
   useEffect(() => {
