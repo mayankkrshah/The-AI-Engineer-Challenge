@@ -81,6 +81,7 @@ export default function ChatPage() {
     currentSessionId,
     addMessageToCurrentSession,
     updateMessageInCurrentSession,
+    removeMessagesAfter,
     handleSwitchSession,
     handleNewSession,
     handleDeleteSession,
@@ -240,11 +241,45 @@ export default function ChatPage() {
     }
   };
 
-  // Handle message editing
-  const handleEditMessage = (messageId: string, newText: string) => {
+  // Handle message editing and regenerate AI response
+  const handleEditMessage = async (messageId: string, newText: string) => {
+    // 1. Update the user message
     updateMessageInCurrentSession(messageId, { text: newText });
     setEditingMessageId(null);
     setEditingText('');
+
+    // 2. Remove all messages after this user message (including the bot response)
+    removeMessagesAfter(messageId);
+
+    // 3. Regenerate AI response for the edited message
+    setIsLoading(true);
+    setError(null);
+    try {
+      const apiKey = sessionStorage.getItem('OPENAI_API_KEY') || '';
+      if (!apiKey.startsWith('sk-')) throw new Error('Invalid API key');
+      // Use the current systemPrompt, model, and temperature
+      const body: any = {
+        system_prompt: systemPrompt,
+        user_message: newText,
+        model,
+        temperature,
+        api_key: apiKey,
+      };
+      const response = await axios.post(`${getApiUrl()}/chat`, body);
+      addMessageToCurrentSession({ text: response.data, sender: 'bot', id: (Date.now() + 1).toString() });
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Error contacting backend.';
+      addMessageToCurrentSession({ 
+        text: 'Sorry, there was an error processing your request.', 
+        sender: 'bot', 
+        id: (Date.now() + 1).toString(),
+        isError: true,
+        errorMessage: errorMsg
+      });
+      setError(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle copying message text

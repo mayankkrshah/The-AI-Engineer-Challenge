@@ -21,6 +21,7 @@ interface SessionContextType {
   setCurrentSessionId: React.Dispatch<React.SetStateAction<string>>;
   addMessageToCurrentSession: (msg: Message) => void;
   updateMessageInCurrentSession: (messageId: string, updatedMessage: Partial<Message>) => void;
+  removeMessagesAfter: (messageId: string) => void;
   handleSwitchSession: (id: string) => void;
   handleNewSession: () => void;
   handleDeleteSession: (id: string) => void;
@@ -94,6 +95,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     ));
   };
 
+  const removeMessagesAfter = (messageId: string) => {
+    setSessions(prev => prev.map(session =>
+      session.id === currentSessionId
+        ? { 
+            ...session, 
+            messages: session.messages.slice(0, session.messages.findIndex(msg => msg.id === messageId) + 1)
+          }
+        : session
+    ));
+  };
+
   const handleSwitchSession = (id: string) => {
     setCurrentSessionId(id);
   };
@@ -137,6 +149,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       setCurrentSessionId,
       addMessageToCurrentSession,
       updateMessageInCurrentSession,
+      removeMessagesAfter,
       handleSwitchSession,
       handleNewSession,
       handleDeleteSession,
