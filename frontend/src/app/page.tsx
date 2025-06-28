@@ -94,6 +94,8 @@ export default function ChatPage() {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [backendHealthy, setBackendHealthy] = useState(true);
   const [healthChecked, setHealthChecked] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const predefinedPrompts = [
     { label: 'Summarize', icon: <SummarizeIcon />, text: 'Summarize the above.' },
@@ -125,25 +127,21 @@ export default function ChatPage() {
     },
   ];
 
-  // Load API key from localStorage
+  // On mount, load API key from sessionStorage and listen for changes
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('openai_api_key');
-    const savedUserApiKey = localStorage.getItem('user_openai_api_key');
-    const savedUseOwnKey = localStorage.getItem('use_own_api_key');
-    
-    if (savedUseOwnKey === 'true' && savedUserApiKey) {
-      setApiKey(savedUserApiKey);
-    } else if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
+    const getKey = () => sessionStorage.getItem('OPENAI_API_KEY') || '';
+    setApiKey(getKey());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'OPENAI_API_KEY') setApiKey(getKey());
+    };
+    const onApiKeyChanged = () => setApiKey(getKey());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('apiKeyChanged', onApiKeyChanged);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('apiKeyChanged', onApiKeyChanged);
+    };
   }, []);
-
-  // Save API key to localStorage
-  useEffect(() => {
-    if (apiKey) {
-      localStorage.setItem('openai_api_key', apiKey);
-    }
-  }, [apiKey]);
 
   // Check backend health
   useEffect(() => {
@@ -168,37 +166,26 @@ export default function ChatPage() {
   // Handle sending a message
   const handleSend = async (event: FormEvent) => {
     event.preventDefault();
-    if (!input.trim() || !apiKey || !backendHealthy) return;
-
+    if (!input.trim() || !apiKey.startsWith('sk-')) return;
     const userMessage = input.trim();
     setInput('');
-
-    // Add user message to current session via context
     addMessageToCurrentSession({ text: userMessage, sender: 'user' });
-
+    setIsLoading(true);
+    setError(null);
     try {
-      const response = await axios.post(`${getApiUrl()}/chat`, {
+      // Build request body based on mode
+      const body: any = {
         system_prompt: systemPrompt,
         user_message: userMessage,
-        model: model,
-        api_key: apiKey
-      });
-
-      let botText = '';
-      if (typeof response.data === 'string') {
-        botText = response.data;
-      } else if (response.data && typeof response.data.detail === 'string') {
-        botText = response.data.detail;
-      } else {
-        botText = 'Sorry, there was an unexpected response from the server.';
-      }
-      addMessageToCurrentSession({ text: botText, sender: 'bot' });
-    } catch (error: any) {
-      let errorText = 'Sorry, there was an error processing your request. Please try again.';
-      if (error.response && error.response.data && typeof error.response.data.detail === 'string') {
-        errorText = error.response.data.detail;
-      }
-      addMessageToCurrentSession({ text: errorText, sender: 'bot' });
+        model,
+      };
+      body.api_key = apiKey;
+      const response = await axios.post(`${getApiUrl()}/chat`, body);
+      addMessageToCurrentSession({ text: response.data, sender: 'bot' });
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Error contacting backend.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -270,14 +257,14 @@ export default function ChatPage() {
           fullWidth
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={!backendHealthy || !apiKey}
+          disabled={!backendHealthy || !apiKey.startsWith('sk-')}
           multiline
           rows={3}
-          sx={{ background: !backendHealthy || !apiKey ? '#f8d7da' : 'white', borderRadius: 2, transition: 'background 0.3s', minHeight: 70 }}
+          sx={{ background: !backendHealthy || !apiKey.startsWith('sk-') ? '#f8d7da' : 'white', borderRadius: 2, transition: 'background 0.3s', minHeight: 70 }}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                {!backendHealthy || !apiKey && (
+                {!backendHealthy || !apiKey.startsWith('sk-') && (
                   <Tooltip title="Enter your OpenAI API key in the sidebar to enable chat.">
                     <KeyIcon color="error" />
                   </Tooltip>
@@ -291,7 +278,7 @@ export default function ChatPage() {
           variant="contained"
           type="submit"
           color="primary"
-          disabled={!backendHealthy || !apiKey || !input.trim()}
+          disabled={!backendHealthy || !apiKey.startsWith('sk-') || !input.trim()}
           sx={{ fontWeight: 700, borderRadius: 2, boxShadow: 2, minWidth: 80, height: 56 }}
           aria-label="Send message"
         >
@@ -303,9 +290,9 @@ export default function ChatPage() {
           Backend is unreachable. Please ensure the backend server is running.
         </Typography>
       )}
-      {!apiKey && (
+      {!apiKey.startsWith('sk-') && (
         <Typography color="warning.main" variant="caption" sx={{ mt: 1, ml: 1 }}>
-          Please enter your OpenAI API key in the sidebar to enable chat.
+          Please enter a valid OpenAI API key in the sidebar to enable chat.
         </Typography>
       )}
     </Box>

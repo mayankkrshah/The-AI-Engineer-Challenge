@@ -45,7 +45,7 @@ const inter = Inter({
 });
 
 // Sidebar component that uses SessionContext
-function Sidebar() {
+function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetStateAction<string>> }) {
   const {
     sessions,
     currentSessionId,
@@ -54,19 +54,16 @@ function Sidebar() {
     handleDeleteSession
   } = useSessionContext();
 
-  const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('gpt-4o-mini');
   const [temperature, setTemperature] = useState(0.7);
-  const [systemPrompt, setSystemPrompt] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.');
+  const [selectedTemplate, setSelectedTemplate] = useState('General Assistant');
   const [backendHealthy, setBackendHealthy] = useState(true);
   const [healthChecked, setHealthChecked] = useState(false);
   const [hoveredSession, setHoveredSession] = useState<string | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [useOwnKey, setUseOwnKey] = useState(false);
-  const [userApiKey, setUserApiKey] = useState('');
 
   const systemPromptTemplates = [
     { name: 'General Assistant', prompt: 'You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.' },
@@ -75,45 +72,6 @@ function Sidebar() {
     { name: 'Academic Tutor', prompt: 'You are an academic tutor. Help explain complex concepts, provide educational guidance, and assist with learning.' },
     { name: 'Business Analyst', prompt: 'You are a business analyst. Help with data analysis, business strategy, and professional insights.' },
   ];
-
-  // Load API key from localStorage
-  useEffect(() => {
-    const savedApiKey = localStorage.getItem('openai_api_key');
-    const savedUserApiKey = localStorage.getItem('user_openai_api_key');
-    const savedUseOwnKey = localStorage.getItem('use_own_api_key');
-    
-    if (savedUseOwnKey === 'true' && savedUserApiKey) {
-      setUseOwnKey(true);
-      setUserApiKey(savedUserApiKey);
-      setApiKey(savedUserApiKey);
-    } else if (savedApiKey) {
-      setApiKey(savedApiKey);
-    } else {
-      // No API key found, show settings popup
-      setSettingsOpen(true);
-    }
-  }, []);
-  
-  // Save API key to localStorage
-  useEffect(() => { 
-    if (apiKey) localStorage.setItem('openai_api_key', apiKey); 
-  }, [apiKey]);
-  
-  // Handle API key settings
-  useEffect(() => {
-    if (useOwnKey) {
-      localStorage.setItem('use_own_api_key', 'true');
-      localStorage.setItem('user_openai_api_key', userApiKey);
-      setApiKey(userApiKey);
-    } else {
-      localStorage.setItem('use_own_api_key', 'false');
-      // Use default key if available
-      const defaultKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-      if (defaultKey) {
-        setApiKey(defaultKey);
-      }
-    }
-  }, [useOwnKey, userApiKey]);
 
   // Check backend health
   useEffect(() => {
@@ -139,20 +97,48 @@ function Sidebar() {
     }
   };
 
+  // General Assistant default prompt
+  const generalAssistantPrompt = 'You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.';
+
+  // On mount and when template changes, sync prompt if not custom
+  useEffect(() => {
+    if (selectedTemplate === 'General Assistant' && (systemPrompt === '' || systemPrompt === generalAssistantPrompt)) {
+      setSystemPrompt(generalAssistantPrompt);
+    }
+  }, [selectedTemplate]);
+
+  // When user types in the prompt, set template to Custom
   const handleSystemPromptChange = (value: string) => {
     setSystemPrompt(value);
-    setSelectedTemplate('');
-  };
-
-  const handleSettingsClose = () => {
-    if (apiKey) {
-      setSettingsOpen(false);
+    if (selectedTemplate !== '' && value !== generalAssistantPrompt) {
+      setSelectedTemplate('');
     }
   };
 
-  const handleGetApiKey = () => {
-    window.open('https://platform.openai.com/api-keys', '_blank');
+  const handleSettingsClose = () => {
+    setSettingsOpen(false);
   };
+
+  useEffect(() => {
+    if (settingsOpen) {
+      const storedApiKey = sessionStorage.getItem('OPENAI_API_KEY') || '';
+      props.setApiKey(storedApiKey);
+    }
+  }, [settingsOpen, props.setApiKey]);
+
+  // Show modal on first load if no API key
+  useEffect(() => {
+    const storedApiKey = sessionStorage.getItem('OPENAI_API_KEY');
+    if (!storedApiKey) {
+      setSettingsOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedTemplate === 'General Assistant') {
+      setSystemPrompt('You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.');
+    }
+  }, [selectedTemplate]);
 
   return (
     <aside style={{
@@ -322,37 +308,6 @@ function Sidebar() {
             <KeyIcon fontSize="small" />
             API Key
           </div>
-          <TextField
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Enter your OpenAI API key"
-            size="small"
-            fullWidth
-            sx={{
-              backgroundColor: '#fff',
-              borderRadius: '4px',
-              input: {
-                color: '#222',
-                '::placeholder': {
-                  color: '#888',
-                  opacity: 1,
-                },
-              },
-              '& fieldset': {
-                borderColor: '#b47ac7',
-              },
-              '&:hover fieldset': {
-                borderColor: '#ffb347',
-              },
-              '&.Mui-focused fieldset': {
-                borderColor: '#a259c4',
-              },
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
           <Button
             variant="outlined"
             fullWidth
@@ -532,9 +487,15 @@ function Sidebar() {
       {/* Settings Popup */}
       <Dialog 
         open={settingsOpen} 
-        onClose={handleSettingsClose}
+        onClose={(event, reason) => {
+          // Only allow closing if there's a valid API key
+          if (props.apiKey.startsWith('sk-')) {
+            handleSettingsClose();
+          }
+        }}
         maxWidth="sm"
         fullWidth
+        disableEscapeKeyDown={!props.apiKey.startsWith('sk-')}
         PaperProps={{
           sx: {
             background: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
@@ -548,133 +509,67 @@ function Sidebar() {
           textAlign: 'center',
           background: 'linear-gradient(135deg, #a259c4 0%, #ffb347 100%)',
           color: '#fff',
-          borderRadius: '16px 16px 0 0'
+          borderRadius: '16px 16px 0 0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
           🚀 Welcome to AI Chat!
+          {props.apiKey.startsWith('sk-') && (
+            <IconButton
+              onClick={handleSettingsClose}
+              sx={{ color: '#fff' }}
+              size="small"
+            >
+              ✕
+            </IconButton>
+          )}
         </DialogTitle>
         
         <DialogContent sx={{ p: 3 }}>
           <Box sx={{ mb: 3 }}>
             <Typography variant="body1" sx={{ mb: 2, color: '#222', fontWeight: 500 }}>
-              To get started, you need an OpenAI API key. Choose your preferred option:
+              To get started, you need an OpenAI API key.
             </Typography>
-            
-            <FormControlLabel
-              control={
-                <Switch 
-                  checked={!useOwnKey} 
-                  onChange={(e) => setUseOwnKey(!e.target.checked)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#a259c4',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#ffb347',
-                    },
-                  }}
-                />
-              }
-              label={
-                <Typography sx={{ color: '#222', fontWeight: 600 }}>
-                  Use Demo Key (Limited Usage)
-                </Typography>
-              }
-              sx={{ mb: 2 }}
-            />
-            
-            <FormControlLabel
-              control={
-                <Switch 
-                  checked={useOwnKey} 
-                  onChange={(e) => setUseOwnKey(e.target.checked)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#a259c4',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#ffb347',
-                    },
-                  }}
-                />
-              }
-              label={
-                <Typography sx={{ color: '#222', fontWeight: 600 }}>
-                  Use My Own API Key (Recommended)
-                </Typography>
-              }
-            />
           </Box>
           
-          {useOwnKey && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
-                Your API key is stored locally and never sent to our servers. 
-                You'll only pay for your own usage.
-              </Typography>
-              
-              <TextField
-                type="password"
-                label="OpenAI API Key"
-                value={userApiKey}
-                onChange={(e) => setUserApiKey(e.target.value)}
-                placeholder="sk-..."
-                fullWidth
-                size="small"
-                sx={{
-                  backgroundColor: '#fff',
-                  borderRadius: '8px',
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': {
-                      borderColor: '#b47ac7',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#ffb347',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#a259c4',
-                    },
-                  },
-                }}
-              />
-              
-              <Button
-                variant="outlined"
-                onClick={handleGetApiKey}
-                sx={{ 
-                  mt: 1, 
-                  color: '#a259c4', 
-                  borderColor: '#a259c4',
-                  '&:hover': {
-                    borderColor: '#ffb347',
-                    color: '#ffb347',
-                  }
-                }}
-              >
-                Get API Key from OpenAI
-              </Button>
-            </Box>
-          )}
-          
-          {!useOwnKey && (
-            <Box sx={{ 
-              p: 2, 
-              backgroundColor: 'rgba(162, 89, 196, 0.1)', 
+          <TextField
+            type="password"
+            label="OpenAI API Key"
+            placeholder="sk-..."
+            fullWidth
+            size="small"
+            value={props.apiKey}
+            onChange={(e) => props.setApiKey(e.target.value)}
+            sx={{
+              backgroundColor: '#fff',
               borderRadius: '8px',
-              border: '1px solid rgba(162, 89, 196, 0.2)'
-            }}>
-              <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                Demo mode uses a shared API key with limited usage. 
-                For unlimited access, switch to your own key.
-              </Typography>
-            </Box>
-          )}
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: '#b47ac7',
+                },
+                '&:hover fieldset': {
+                  borderColor: '#ffb347',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#a259c4',
+                },
+              },
+            }}
+          />
         </DialogContent>
         
         <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button
-            onClick={handleSettingsClose}
+            onClick={() => {
+              if (props.apiKey.startsWith('sk-')) {
+                sessionStorage.setItem('OPENAI_API_KEY', props.apiKey);
+                window.dispatchEvent(new Event('apiKeyChanged'));
+                handleSettingsClose();
+              }
+            }}
             variant="contained"
-            disabled={!apiKey}
+            disabled={!props.apiKey.startsWith('sk-')}
             sx={{
               background: 'linear-gradient(135deg, #a259c4 0%, #ffb347 100%)',
               color: '#fff',
@@ -682,12 +577,9 @@ function Sidebar() {
               px: 3,
               py: 1,
               borderRadius: '8px',
-              '&:disabled': {
-                background: '#ccc',
-              }
             }}
           >
-            {apiKey ? 'Start Chatting!' : 'Please Enter API Key'}
+            Start Chatting!
           </Button>
         </DialogActions>
       </Dialog>
@@ -696,6 +588,15 @@ function Sidebar() {
 }
 
 export default function RootLayout(props: { children: React.ReactNode }) {
+  const [apiKey, setApiKey] = useState('');
+
+  useEffect(() => {
+    const storedApiKey = sessionStorage.getItem('OPENAI_API_KEY');
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    }
+  }, []);
+
   return (
     <html lang="en">
       <head>
@@ -710,7 +611,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
           <SessionProvider>
             <CssBaseline />
             <div style={{ display: 'flex', height: '100vh', width: '100vw', margin: 0, padding: 0 }}>
-              <Sidebar />
+              <Sidebar apiKey={apiKey} setApiKey={setApiKey} />
               {/* Main Chat Area */}
               <main style={{ 
                 flex: 1, 
