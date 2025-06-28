@@ -40,12 +40,16 @@ import InputLabel from '@mui/material/InputLabel';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import Chip from '@mui/material/Chip';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { AppBar, Toolbar, CssBaseline, Container, Menu } from '@mui/material';
 import { useSessionContext } from './SessionContext';
 
 interface Message {
   text: string;
   sender: 'user' | 'bot';
+  id?: string;
+  isError?: boolean;
+  errorMessage?: string;
 }
 
 interface Session {
@@ -76,6 +80,7 @@ export default function ChatPage() {
     sessions,
     currentSessionId,
     addMessageToCurrentSession,
+    updateMessageInCurrentSession,
     handleSwitchSession,
     handleNewSession,
     handleDeleteSession
@@ -96,6 +101,10 @@ export default function ChatPage() {
   const [healthChecked, setHealthChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
   const predefinedPrompts = [
     { label: 'Summarize', icon: <SummarizeIcon />, text: 'Summarize the above.' },
@@ -164,12 +173,13 @@ export default function ChatPage() {
   }, [healthChecked]);
 
   // Handle sending a message
-  const handleSend = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleSend = async (event?: FormEvent) => {
+    if (event) event.preventDefault();
     if (!input.trim() || !apiKey.startsWith('sk-')) return;
     const userMessage = input.trim();
     setInput('');
-    addMessageToCurrentSession({ text: userMessage, sender: 'user' });
+    const messageId = Date.now().toString();
+    addMessageToCurrentSession({ text: userMessage, sender: 'user', id: messageId });
     setIsLoading(true);
     setError(null);
     try {
@@ -181,11 +191,68 @@ export default function ChatPage() {
       };
       body.api_key = apiKey;
       const response = await axios.post(`${getApiUrl()}/chat`, body);
-      addMessageToCurrentSession({ text: response.data, sender: 'bot' });
+      addMessageToCurrentSession({ text: response.data, sender: 'bot', id: (Date.now() + 1).toString() });
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error contacting backend.');
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Error contacting backend.';
+      
+      // Check if it's an API key related error
+      const isApiKeyError = errorMsg.toLowerCase().includes('api key') || 
+                           errorMsg.toLowerCase().includes('authentication') ||
+                           errorMsg.toLowerCase().includes('unauthorized') ||
+                           err?.response?.status === 401;
+      
+      if (isApiKeyError) {
+        // Clear the invalid API key from sessionStorage
+        sessionStorage.removeItem('OPENAI_API_KEY');
+        setApiKey('');
+        // Dispatch event to show API key modal
+        window.dispatchEvent(new Event('apiKeyCleared'));
+        // Show error message asking for valid key
+        addMessageToCurrentSession({ 
+          text: 'Your API key appears to be invalid. Please enter a valid OpenAI API key in the sidebar to continue chatting.', 
+          sender: 'bot', 
+          id: (Date.now() + 1).toString(),
+          isError: true,
+          errorMessage: 'Invalid API key. Please update your API key in the sidebar.'
+        });
+      } else {
+        addMessageToCurrentSession({ 
+          text: 'Sorry, there was an error processing your request.', 
+          sender: 'bot', 
+          id: (Date.now() + 1).toString(),
+          isError: true,
+          errorMessage: errorMsg
+        });
+      }
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle Enter key press
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Handle message editing
+  const handleEditMessage = (messageId: string, newText: string) => {
+    updateMessageInCurrentSession(messageId, { text: newText });
+    setEditingMessageId(null);
+    setEditingText('');
+  };
+
+  // Handle copying message text
+  const handleCopyMessage = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(messageId);
+      setTimeout(() => setCopySuccess(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
     }
   };
 
@@ -197,54 +264,202 @@ export default function ChatPage() {
         <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="sidebar-scroll">
           <List>
             {messages.map((message, index) => (
-              <Fade in timeout={400} key={index}>
+              <Fade in timeout={400} key={message.id || index}>
                 <ListItem sx={{ justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end' }}>
+                  <Box 
+                    sx={{
+                      textAlign: message.sender === 'user' ? 'right' : 'left',
+                      background: message.isError 
+                        ? 'linear-gradient(135deg, #ffebee 60%, #ffcdd2 100%)'
+                        : message.sender === 'user'
+                          ? 'linear-gradient(135deg, #e3f2fd 60%, #b3c6fc 100%)'
+                          : 'linear-gradient(135deg, #f1f8e9 60%, #f9e7c4 100%)',
+                      borderRadius: '16px',
+                      padding: '12px 18px',
+                      maxWidth: '70%',
+                      width: 'fit-content',
+                      boxShadow: '0 2px 12px #7C3AED22',
+                      position: 'relative',
+                      transition: 'background 0.3s',
+                      fontSize: '1.08em',
+                      fontFamily: 'Inter, Roboto, Arial, sans-serif',
+                      border: message.isError ? '1px solid #f44336' : 'none',
+                    }}
+                    onMouseEnter={() => setHoveredMessageId(message.id || null)}
+                    onMouseLeave={() => setHoveredMessageId(null)}
+                  >
+                    {editingMessageId === message.id ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <TextField
+                          multiline
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          variant="outlined"
+                          size="small"
+                          sx={{ minWidth: 200 }}
+                        />
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <Button size="small" onClick={() => setEditingMessageId(null)}>
+                            Cancel
+                          </Button>
+                          <Button size="small" variant="contained" onClick={() => handleEditMessage(message.id!, editingText)}>
+                            Save
+                          </Button>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <>
+                        <ReactMarkdown
+                          components={{
+                            code({node, className, children, ...props}) {
+                              return (
+                                <Box component="span" sx={{
+                                  display: 'block',
+                                  background: '#7C3AED',
+                                  color: 'white',
+                                  borderRadius: 1,
+                                  px: 1,
+                                  py: 0.5,
+                                  fontFamily: 'Fira Mono, monospace',
+                                  fontSize: '0.95em',
+                                  my: 1,
+                                  overflowX: 'auto',
+                                }}>
+                                  {children}
+                                </Box>
+                              );
+                            },
+                            li({children, ...props}) {
+                              return <li style={{ color: '#F59E42', fontWeight: 600 }}>{children}</li>;
+                            },
+                          }}
+                        >
+                          {typeof message.text === 'string' ? message.text : JSON.stringify(message.text)}
+                        </ReactMarkdown>
+                        {message.isError && message.errorMessage && (
+                          <Box sx={{ 
+                            mt: 1, 
+                            p: 1, 
+                            backgroundColor: 'rgba(244, 67, 54, 0.1)', 
+                            borderRadius: 1,
+                            border: '1px solid rgba(244, 67, 54, 0.3)',
+                            fontSize: '0.8em',
+                            color: '#d32f2f'
+                          }}>
+                            <strong>Error:</strong> {message.errorMessage}
+                          </Box>
+                        )}
+                        
+                        {/* Hover menu for user messages */}
+                        {message.sender === 'user' && hoveredMessageId === message.id && (
+                          <Box sx={{
+                            position: 'absolute',
+                            top: -8,
+                            right: -8,
+                            background: 'rgba(255, 255, 255, 0.95)',
+                            backdropFilter: 'blur(10px)',
+                            borderRadius: '12px',
+                            padding: '4px',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                            border: '1px solid rgba(0, 0, 0, 0.1)',
+                            display: 'flex',
+                            gap: '4px',
+                            zIndex: 10,
+                            animation: 'fadeIn 0.2s ease-in-out',
+                            '@keyframes fadeIn': {
+                              '0%': { opacity: 0, transform: 'scale(0.9)' },
+                              '100%': { opacity: 1, transform: 'scale(1)' }
+                            }
+                          }}>
+                            <Tooltip title="Copy message">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopyMessage(message.text, message.id!)}
+                                sx={{
+                                  color: copySuccess === message.id ? '#4caf50' : '#666',
+                                  transition: 'all 0.2s',
+                                  '&:hover': {
+                                    background: 'rgba(76, 175, 80, 0.1)',
+                                    color: '#4caf50'
+                                  }
+                                }}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Edit message">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setEditingMessageId(message.id!);
+                                  setEditingText(message.text);
+                                }}
+                                sx={{
+                                  color: '#666',
+                                  transition: 'all 0.2s',
+                                  '&:hover': {
+                                    background: 'rgba(33, 150, 243, 0.1)',
+                                    color: '#2196f3'
+                                  }
+                                }}
+                              >
+                                <EditNoteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        )}
+                        
+                        {/* Copy success indicator */}
+                        {copySuccess === message.id && (
+                          <Box sx={{
+                            position: 'absolute',
+                            top: -8,
+                            right: -8,
+                            background: '#4caf50',
+                            color: 'white',
+                            borderRadius: '8px',
+                            padding: '4px 8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            zIndex: 11,
+                            animation: 'slideIn 0.3s ease-out',
+                            '@keyframes slideIn': {
+                              '0%': { opacity: 0, transform: 'translateY(-10px)' },
+                              '100%': { opacity: 1, transform: 'translateY(0)' }
+                            }
+                          }}>
+                            Copied!
+                          </Box>
+                        )}
+                      </>
+                    )}
+                  </Box>
+                </ListItem>
+              </Fade>
+            ))}
+            {isLoading && (
+              <Fade in timeout={400}>
+                <ListItem sx={{ justifyContent: 'flex-start', alignItems: 'flex-end' }}>
                   <Box sx={{
-                    textAlign: message.sender === 'user' ? 'right' : 'left',
-                    background: message.sender === 'user'
-                      ? 'linear-gradient(135deg, #e3f2fd 60%, #b3c6fc 100%)'
-                      : 'linear-gradient(135deg, #f1f8e9 60%, #f9e7c4 100%)',
+                    background: 'linear-gradient(135deg, #f1f8e9 60%, #f9e7c4 100%)',
                     borderRadius: '16px',
                     padding: '12px 18px',
                     maxWidth: '70%',
                     width: 'fit-content',
                     boxShadow: '0 2px 12px #7C3AED22',
-                    position: 'relative',
-                    transition: 'background 0.3s',
-                    fontSize: '1.08em',
-                    fontFamily: 'Inter, Roboto, Arial, sans-serif',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    minWidth: '120px',
                   }}>
-                    <ReactMarkdown
-                      components={{
-                        code({node, className, children, ...props}) {
-                          return (
-                            <Box component="span" sx={{
-                              display: 'block',
-                              background: '#7C3AED',
-                              color: 'white',
-                              borderRadius: 1,
-                              px: 1,
-                              py: 0.5,
-                              fontFamily: 'Fira Mono, monospace',
-                              fontSize: '0.95em',
-                              my: 1,
-                              overflowX: 'auto',
-                            }}>
-                              {children}
-                            </Box>
-                          );
-                        },
-                        li({children, ...props}) {
-                          return <li style={{ color: '#F59E42', fontWeight: 600 }}>{children}</li>;
-                        },
-                      }}
-                    >
-                      {typeof message.text === 'string' ? message.text : JSON.stringify(message.text)}
-                    </ReactMarkdown>
+                    <CircularProgress size={16} sx={{ color: '#7C3AED' }} />
+                    <Typography sx={{ color: '#333', fontWeight: 500, fontSize: '0.9em' }}>
+                      Thinking...
+                    </Typography>
                   </Box>
                 </ListItem>
               </Fade>
-            ))}
+            )}
           </List>
         </Box>
       </Paper>
@@ -252,11 +467,12 @@ export default function ChatPage() {
       <Box component="form" onSubmit={handleSend} sx={{ width: '100%', display: 'flex', alignItems: 'center', p: 1.5, background: 'rgba(255,255,255,0.98)', borderRadius: 0, borderTop: '1px solid #ececec', boxShadow: 1, gap: 1, minHeight: 90 }}>
         <TextField
           label="Type your message"
-          placeholder="Ask me anything..."
+          placeholder="Ask me anything... (Press Enter to send, Shift+Enter for new line)"
           variant="outlined"
           fullWidth
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
           disabled={!backendHealthy || !apiKey.startsWith('sk-')}
           multiline
           rows={3}

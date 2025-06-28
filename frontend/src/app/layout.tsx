@@ -134,6 +134,15 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     }
   }, []);
 
+  // Listen for API key cleared event (when key is invalid)
+  useEffect(() => {
+    const handleApiKeyCleared = () => {
+      setSettingsOpen(true);
+    };
+    window.addEventListener('apiKeyCleared', handleApiKeyCleared);
+    return () => window.removeEventListener('apiKeyCleared', handleApiKeyCleared);
+  }, []);
+
   useEffect(() => {
     if (selectedTemplate === 'General Assistant') {
       setSystemPrompt('You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.');

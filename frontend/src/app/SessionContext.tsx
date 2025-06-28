@@ -3,6 +3,9 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 export interface Message {
   text: string;
   sender: 'user' | 'bot';
+  id?: string;
+  isError?: boolean;
+  errorMessage?: string;
 }
 
 export interface Session {
@@ -17,6 +20,7 @@ interface SessionContextType {
   currentSessionId: string;
   setCurrentSessionId: React.Dispatch<React.SetStateAction<string>>;
   addMessageToCurrentSession: (msg: Message) => void;
+  updateMessageInCurrentSession: (messageId: string, updatedMessage: Partial<Message>) => void;
   handleSwitchSession: (id: string) => void;
   handleNewSession: () => void;
   handleDeleteSession: (id: string) => void;
@@ -63,7 +67,20 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const addMessageToCurrentSession = (msg: Message) => {
     setSessions(prev => prev.map(session =>
       session.id === currentSessionId
-        ? { ...session, messages: [...session.messages, msg] }
+        ? { ...session, messages: [...session.messages, { ...msg, id: msg.id || Date.now().toString() }] }
+        : session
+    ));
+  };
+
+  const updateMessageInCurrentSession = (messageId: string, updatedMessage: Partial<Message>) => {
+    setSessions(prev => prev.map(session =>
+      session.id === currentSessionId
+        ? { 
+            ...session, 
+            messages: session.messages.map(msg => 
+              msg.id === messageId ? { ...msg, ...updatedMessage } : msg
+            )
+          }
         : session
     ));
   };
@@ -110,6 +127,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       currentSessionId,
       setCurrentSessionId,
       addMessageToCurrentSession,
+      updateMessageInCurrentSession,
       handleSwitchSession,
       handleNewSession,
       handleDeleteSession
