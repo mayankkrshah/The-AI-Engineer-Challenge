@@ -24,6 +24,10 @@ interface SessionContextType {
   handleSwitchSession: (id: string) => void;
   handleNewSession: () => void;
   handleDeleteSession: (id: string) => void;
+  systemPrompt: string;
+  setSystemPrompt: React.Dispatch<React.SetStateAction<string>>;
+  selectedTemplate: string;
+  setSelectedTemplate: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -37,6 +41,8 @@ export const useSessionContext = () => {
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.');
+  const [selectedTemplate, setSelectedTemplate] = useState('General Assistant');
 
   // Load sessions from localStorage on mount
   useEffect(() => {
@@ -130,7 +136,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       updateMessageInCurrentSession,
       handleSwitchSession,
       handleNewSession,
-      handleDeleteSession
+      handleDeleteSession,
+      systemPrompt,
+      setSystemPrompt,
+      selectedTemplate,
+      setSelectedTemplate
     }}>
       {children}
     </SessionContext.Provider>

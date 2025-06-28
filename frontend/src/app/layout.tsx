@@ -51,13 +51,15 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     currentSessionId,
     handleSwitchSession,
     handleNewSession,
-    handleDeleteSession
+    handleDeleteSession,
+    systemPrompt,
+    setSystemPrompt,
+    selectedTemplate,
+    setSelectedTemplate
   } = useSessionContext();
 
   const [model, setModel] = useState('gpt-4o-mini');
   const [temperature, setTemperature] = useState(0.7);
-  const [systemPrompt, setSystemPrompt] = useState('You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.');
-  const [selectedTemplate, setSelectedTemplate] = useState('General Assistant');
   const [backendHealthy, setBackendHealthy] = useState(true);
   const [healthChecked, setHealthChecked] = useState(false);
   const [hoveredSession, setHoveredSession] = useState<string | null>(null);

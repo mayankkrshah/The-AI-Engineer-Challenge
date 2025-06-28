@@ -83,7 +83,11 @@ export default function ChatPage() {
     updateMessageInCurrentSession,
     handleSwitchSession,
     handleNewSession,
-    handleDeleteSession
+    handleDeleteSession,
+    systemPrompt,
+    setSystemPrompt,
+    selectedTemplate,
+    setSelectedTemplate
   } = useSessionContext();
 
   // Find the current session and its messages
@@ -95,8 +99,6 @@ export default function ChatPage() {
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('gpt-4o-mini');
   const [temperature, setTemperature] = useState(0.7);
-  const [systemPrompt, setSystemPrompt] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState('');
   const [backendHealthy, setBackendHealthy] = useState(true);
   const [healthChecked, setHealthChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -289,14 +291,14 @@ export default function ChatPage() {
                     onMouseLeave={() => setHoveredMessageId(null)}
                   >
                     {editingMessageId === message.id ? (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: '70%', width: '100%' }}>
                         <TextField
                           multiline
                           value={editingText}
                           onChange={(e) => setEditingText(e.target.value)}
                           variant="outlined"
                           size="small"
-                          sx={{ minWidth: 200 }}
+                          sx={{ width: '100%', maxWidth: '100%' }}
                         />
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                           <Button size="small" onClick={() => setEditingMessageId(null)}>
