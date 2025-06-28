@@ -101,6 +101,9 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     if (template) {
       setSystemPrompt(template.prompt);
       setSelectedTemplate(templateName);
+    } else if (templateName === 'Custom') {
+      setSystemPrompt('');
+      setSelectedTemplate('Custom');
     }
   };
 
@@ -114,12 +117,14 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     }
   }, [selectedTemplate]);
 
-  // When user types in the prompt, set template to Custom
+  // When user types in the prompt, keep the selected template but allow customization
   const handleSystemPromptChange = (value: string) => {
     setSystemPrompt(value);
-    if (selectedTemplate !== '' && value !== generalAssistantPrompt) {
-      setSelectedTemplate('');
+    // Only switch to Custom if user completely clears the prompt
+    if (value.trim() === '') {
+      setSelectedTemplate('Custom');
     }
+    // Otherwise, keep the current selected template
   };
 
   const handleSettingsClose = () => {
@@ -452,6 +457,9 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                   {template.name}
                 </MenuItem>
               ))}
+              <MenuItem value="Custom">
+                ✏️ Custom
+              </MenuItem>
             </Select>
           </FormControl>
         </div>
