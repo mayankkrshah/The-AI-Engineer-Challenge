@@ -251,8 +251,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                   {session.messages.length} messages
                 </div>
               </div>
-              {/* Show menu button only if more than one session */}
-              {hoveredSession === session.id && sessions.length > 1 && (
+              {/* Show menu button for all sessions (including the last one) */}
+              {hoveredSession === session.id && (
                 <>
                   <IconButton
                     size="small"
@@ -289,6 +289,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                         setMenuAnchorEl(null);
                       }}
                       style={{ color: '#ff6b6b' }}
+                      title={sessions.length === 1 ? "Delete this session and create a new fresh one" : "Delete this session"}
                     >
                       Delete Session
                     </MenuItem>
