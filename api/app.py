@@ -1,13 +1,14 @@
 # Import required FastAPI components for building the API
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 # Import Pydantic for data validation and settings management
 from pydantic import BaseModel
 # Import OpenAI client for interacting with OpenAI's API
 from openai import OpenAI
 import os
-from typing import Optional
+from typing import Optional, List
+from time import time
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -25,46 +26,45 @@ app.add_middleware(
 # Define the data model for chat requests using Pydantic
 # This ensures incoming request data is properly validated
 class ChatRequest(BaseModel):
-    developer_message: str  # Message from the developer/system
-    user_message: str      # Message from the user
-    model: Optional[str] = "gpt-3.5-turbo"  # Optional model selection with default
-    api_key: str          # OpenAI API key for authentication
+    system_prompt: str  # Custom system/developer message
+    user_message: str  # Message from the user
+    model: str = "gpt-3.5-turbo"  # Model selection
+    api_key: str  # OpenAI API key for authentication
 
 # Define the main chat endpoint that handles POST requests
-@app.post("/api/chat")
+@app.post("/api/chat", response_class=PlainTextResponse)
 async def chat(request: ChatRequest):
     try:
-        # Initialize OpenAI client with the provided API key
+        # For OpenAI 1.12.0, we need to use the correct initialization
         client = OpenAI(api_key=request.api_key)
+        messages = []
         
-        # Create an async generator function for streaming responses
-        async def generate():
-            # Create a streaming chat completion request
-            stream = client.chat.completions.create(
-                model=request.model,
-                messages=[
-                    {"role": "developer", "content": request.developer_message},
-                    {"role": "user", "content": request.user_message}
-                ],
-                stream=True  # Enable streaming response
-            )
-            
-            # Yield each chunk of the response as it becomes available
-            for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
-
-        # Return a streaming response to the client
-        return StreamingResponse(generate(), media_type="text/plain")
-    
+        # Add system prompt
+        if request.system_prompt:
+            messages.append({"role": "system", "content": request.system_prompt})
+        else:
+            # Default system prompt for better formatting
+            messages.append({"role": "system", "content": "You are a helpful AI assistant. When providing mathematical explanations, use clear, readable text format rather than LaTeX notation. For example, write '3 packs' instead of mathematical notation. Keep responses conversational and easy to understand."})
+        
+        # Add user message
+        messages.append({"role": "user", "content": request.user_message})
+        
+        # Use the correct API call for OpenAI 1.12.0
+        response = client.chat.completions.create(
+            model=request.model,
+            messages=messages
+        )
+        
+        # Return only the string content, not the raw response object
+        return response.choices[0].message.content
     except Exception as e:
-        # Handle any errors that occur during processing
+        # Return a more detailed error for debugging
         raise HTTPException(status_code=500, detail=str(e))
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
-async def health_check():
-    return {"status": "ok"}
+def health():
+    return JSONResponse(content={"status": "ok"})
 
 # Entry point for running the application directly
 if __name__ == "__main__":

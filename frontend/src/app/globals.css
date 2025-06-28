@@ -18,3 +18,19 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Thin, styled scrollbar for the sidebar content */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #bbb #f3f3f3;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #bbb;
+  border-radius: 3px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #f3f3f3;
+}
