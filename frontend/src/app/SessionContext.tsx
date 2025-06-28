@@ -52,27 +52,46 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const savedSessions = localStorage.getItem('chatSessions');
     if (savedSessions) {
-      const parsedSessions = JSON.parse(savedSessions).map((session: any) => ({
-        ...session,
-        messages: session.messages.map((msg: any) => ({ ...msg, sender: msg.sender as 'user' | 'bot' }))
-      }));
-      setSessions(parsedSessions);
-      if (parsedSessions.length > 0) setCurrentSessionId(parsedSessions[0].id);
+      try {
+        const parsedSessions = JSON.parse(savedSessions).map((session: any) => ({
+          ...session,
+          messages: session.messages.map((msg: any) => ({ ...msg, sender: msg.sender as 'user' | 'bot' }))
+        }));
+        setSessions(parsedSessions);
+        if (parsedSessions.length > 0) {
+          setCurrentSessionId(parsedSessions[0].id);
+        }
+      } catch (error) {
+        console.error('Error parsing saved sessions:', error);
+        // If parsing fails, create a new session
+        createInitialSession();
+      }
     } else {
-      const initialSession: Session = {
-        id: Date.now().toString(),
-        name: 'Session ' + new Date().toLocaleString(),
-        messages: [{ text: 'Hello! How can I assist you today?', sender: 'bot' }]
-      };
-      setSessions([initialSession]);
-      setCurrentSessionId(initialSession.id);
+      createInitialSession();
     }
   }, []);
+
+  const createInitialSession = () => {
+    const initialSession: Session = {
+      id: Date.now().toString(),
+      name: 'Session ' + new Date().toLocaleString(),
+      messages: [{ text: 'Hello! How can I assist you today?', sender: 'bot' }]
+    };
+    setSessions([initialSession]);
+    setCurrentSessionId(initialSession.id);
+  };
 
   // Persist sessions to localStorage
   useEffect(() => {
     if (sessions.length > 0) localStorage.setItem('chatSessions', JSON.stringify(sessions));
   }, [sessions]);
+
+  // Ensure we always have a valid current session
+  useEffect(() => {
+    if (sessions.length > 0 && (!currentSessionId || !sessions.some(s => s.id === currentSessionId))) {
+      setCurrentSessionId(sessions[0].id);
+    }
+  }, [sessions, currentSessionId]);
 
   const addMessageToCurrentSession = (msg: Message) => {
     setSessions(prev => prev.map(session =>
@@ -107,7 +126,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleSwitchSession = (id: string) => {
-    setCurrentSessionId(id);
+    // Validate that the session exists before switching
+    const sessionExists = sessions.some(session => session.id === id);
+    if (sessionExists) {
+      setCurrentSessionId(id);
+    } else {
+      console.warn(`Session with id ${id} not found`);
+      // Fallback to first session if the requested session doesn't exist
+      if (sessions.length > 0) {
+        setCurrentSessionId(sessions[0].id);
+      }
+    }
   };
 
   const handleNewSession = () => {
@@ -124,19 +153,25 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const handleDeleteSession = (id: string) => {
     setSessions(prev => {
       const updated = prev.filter(session => session.id !== id);
-      if (id === currentSessionId && updated.length > 0) {
-        setCurrentSessionId(updated[0].id);
-      } else if (updated.length === 0) {
-        // If all sessions deleted, create a new one
-        const newId = Date.now().toString();
-        const newSession: Session = {
-          id: newId,
-          name: 'Session ' + new Date().toLocaleString(),
-          messages: [{ text: 'Hello! How can I assist you today?', sender: 'bot' }]
-        };
-        setCurrentSessionId(newId);
-        return [newSession];
+      
+      // If we're deleting the current session
+      if (id === currentSessionId) {
+        if (updated.length > 0) {
+          // Switch to the first available session
+          setCurrentSessionId(updated[0].id);
+        } else {
+          // If no sessions left, create a new one
+          const newId = Date.now().toString();
+          const newSession: Session = {
+            id: newId,
+            name: 'Session ' + new Date().toLocaleString(),
+            messages: [{ text: 'Hello! How can I assist you today?', sender: 'bot' }]
+          };
+          setCurrentSessionId(newId);
+          return [newSession];
+        }
       }
+      
       return updated;
     });
   };
