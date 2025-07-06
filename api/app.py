@@ -14,6 +14,7 @@ from aimakerspace.vectordatabase import VectorDatabase
 import uuid
 import tempfile
 import asyncio
+from aimakerspace.openai_utils.embedding import EmbeddingModel
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -81,10 +82,11 @@ class PDFChatRequest(BaseModel):
     model: str = "gpt-3.5-turbo"
 
 @app.post("/api/upload_pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
     """
     Accepts a PDF file, extracts text, splits into chunks, builds a vector DB, and returns a session ID.
     """
+    os.environ["OPENAI_API_KEY"] = api_key  # Set the API key for this request
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     try:
@@ -98,7 +100,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_texts(texts)
         # Build vector DB asynchronously
-        vector_db = VectorDatabase()
+        vector_db = VectorDatabase(embedding_model=EmbeddingModel())
         await vector_db.abuild_from_list(chunks)
         # Store in session
         session_id = str(uuid.uuid4())
