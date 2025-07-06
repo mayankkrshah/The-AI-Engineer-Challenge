@@ -25,7 +25,8 @@ import {
   DialogContent,
   DialogActions,
   FormControlLabel,
-  Switch
+  Switch,
+  Alert
 } from '@mui/material';
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -34,10 +35,12 @@ import KeyIcon from '@mui/icons-material/VpnKey';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { getApiUrl } from '../utils/config';
 import axios from 'axios';
 import theme from './theme';
 import { SessionProvider, useSessionContext } from './SessionContext';
+import { PDFSessionProvider, usePDFSession } from './PDFSessionContext';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -57,6 +60,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     selectedTemplate,
     setSelectedTemplate
   } = useSessionContext();
+
+  const { pdfSessionId, setPdfSessionId, pdfUploadStatus, setPdfUploadStatus, pdfError, setPdfError } = usePDFSession();
 
   const [model, setModel] = useState('gpt-4o-mini');
   const [temperature, setTemperature] = useState(0.7);
@@ -153,6 +158,27 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     }
   }, [selectedTemplate]);
 
+  // PDF upload handler
+  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPdfUploadStatus('uploading');
+    setPdfError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', props.apiKey);
+      const response = await axios.post(`${getApiUrl()}/upload_pdf`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setPdfSessionId(response.data.session_id);
+      setPdfUploadStatus('success');
+    } catch (err: any) {
+      setPdfUploadStatus('error');
+      setPdfError(err?.response?.data?.detail || 'PDF upload failed.');
+    }
+  };
+
   return (
     <aside style={{
       width: 380,
@@ -197,6 +223,36 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         >
           New Chat
         </Button>
+        {/* PDF Upload Button */}
+        <label htmlFor="pdf-upload-input">
+          <input
+            id="pdf-upload-input"
+            type="file"
+            accept="application/pdf"
+            style={{ display: 'none' }}
+            onChange={handlePdfUpload}
+          />
+          <Button
+            variant="outlined"
+            fullWidth
+            component="span"
+            startIcon={<CloudUploadIcon />}
+            sx={{ mt: 2, borderRadius: '12px', textTransform: 'none', fontWeight: 600 }}
+            disabled={pdfUploadStatus === 'uploading'}
+          >
+            {pdfUploadStatus === 'uploading' ? 'Uploading PDF...' : 'Upload PDF'}
+          </Button>
+        </label>
+        {pdfUploadStatus === 'success' && (
+          <Alert severity="success" sx={{ mt: 1, borderRadius: '8px' }}>
+            PDF uploaded! You can now chat with it.
+          </Alert>
+        )}
+        {pdfUploadStatus === 'error' && pdfError && (
+          <Alert severity="error" sx={{ mt: 1, borderRadius: '8px' }}>
+            {pdfError}
+          </Alert>
+        )}
       </div>
 
       {/* Sessions List */}
@@ -638,22 +694,24 @@ export default function RootLayout(props: { children: React.ReactNode }) {
       }}>
         <ThemeProvider theme={theme}>
           <SessionProvider>
-            <CssBaseline />
-            <div style={{ display: 'flex', height: '100vh', width: '100vw', margin: 0, padding: 0 }}>
-              <Sidebar apiKey={apiKey} setApiKey={setApiKey} />
-              {/* Main Chat Area */}
-              <main style={{ 
-                flex: 1, 
-                display: 'flex', 
-                flexDirection: 'column',
-                background: '#fff',
-                borderRadius: '0 0 0 24px',
-                overflow: 'hidden',
-                boxShadow: 'none',
-              }}>
-                {props.children}
-              </main>
-            </div>
+            <PDFSessionProvider>
+              <CssBaseline />
+              <div style={{ display: 'flex', height: '100vh', width: '100vw', margin: 0, padding: 0 }}>
+                <Sidebar apiKey={apiKey} setApiKey={setApiKey} />
+                {/* Main Chat Area */}
+                <main style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  background: '#fff',
+                  borderRadius: '0 0 0 24px',
+                  overflow: 'hidden',
+                  boxShadow: 'none',
+                }}>
+                  {props.children}
+                </main>
+              </div>
+            </PDFSessionProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>

@@ -43,6 +43,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { AppBar, Toolbar, CssBaseline, Container, Menu } from '@mui/material';
 import { useSessionContext } from './SessionContext';
+import { usePDFSession } from './PDFSessionContext';
 
 interface Message {
   text: string;
@@ -90,6 +91,8 @@ export default function ChatPage() {
     selectedTemplate,
     setSelectedTemplate
   } = useSessionContext();
+
+  const { pdfSessionId } = usePDFSession();
 
   // Find the current session and its messages
   const currentSession = sessions.find(s => s.id === currentSessionId);
@@ -186,48 +189,31 @@ export default function ChatPage() {
     setIsLoading(true);
     setError(null);
     try {
-      // Build request body based on mode
-      const body: any = {
-        system_prompt: systemPrompt,
-        user_message: userMessage,
-        model,
-      };
-      body.api_key = apiKey;
-      const response = await axios.post(`${getApiUrl()}/chat`, body);
-      addMessageToCurrentSession({ text: response.data, sender: 'bot', id: (Date.now() + 1).toString() });
+      let response;
+      if (pdfSessionId) {
+        // PDF chat mode
+        response = await axios.post(`${getApiUrl()}/pdf_chat`, {
+          session_id: pdfSessionId,
+          question: userMessage,
+          api_key: apiKey,
+          model,
+        });
+        addMessageToCurrentSession({ text: response.data, sender: 'bot', id: (Date.now() + 1).toString() });
+      } else {
+        // Normal chat mode
+        const body: any = {
+          system_prompt: systemPrompt,
+          user_message: userMessage,
+          model,
+        };
+        body.api_key = apiKey;
+        response = await axios.post(`${getApiUrl()}/chat`, body);
+        addMessageToCurrentSession({ text: response.data, sender: 'bot', id: (Date.now() + 1).toString() });
+      }
     } catch (err: any) {
       const errorMsg = err?.response?.data?.detail || err?.message || 'Error contacting backend.';
-      
-      // Check if it's an API key related error
-      const isApiKeyError = errorMsg.toLowerCase().includes('api key') || 
-                           errorMsg.toLowerCase().includes('authentication') ||
-                           errorMsg.toLowerCase().includes('unauthorized') ||
-                           err?.response?.status === 401;
-      
-      if (isApiKeyError) {
-        // Clear the invalid API key from sessionStorage
-        sessionStorage.removeItem('OPENAI_API_KEY');
-        setApiKey('');
-        // Dispatch event to show API key modal
-        window.dispatchEvent(new Event('apiKeyCleared'));
-        // Show error message asking for valid key
-        addMessageToCurrentSession({ 
-          text: 'Your API key appears to be invalid. Please enter a valid OpenAI API key in the sidebar to continue chatting.', 
-          sender: 'bot', 
-          id: (Date.now() + 1).toString(),
-          isError: true,
-          errorMessage: 'Invalid API key. Please update your API key in the sidebar.'
-        });
-      } else {
-        addMessageToCurrentSession({ 
-          text: 'Sorry, there was an error processing your request.', 
-          sender: 'bot', 
-          id: (Date.now() + 1).toString(),
-          isError: true,
-          errorMessage: errorMsg
-        });
-      }
       setError(errorMsg);
+      updateMessageInCurrentSession(messageId, { isError: true, errorMessage: errorMsg });
     } finally {
       setIsLoading(false);
     }
@@ -295,6 +281,12 @@ export default function ChatPage() {
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* PDF Chat Mode Indicator */}
+      {pdfSessionId && (
+        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+          <b>PDF Chat Mode:</b> You are chatting with your uploaded PDF.
+        </Alert>
+      )}
       {/* Chat messages */}
       <Paper elevation={2} sx={{ flex: 1, mb: 0, p: 2, background: 'rgba(255,255,255,0.98)', borderRadius: 0, boxShadow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
         {/* Only the message list is scrollable */}
