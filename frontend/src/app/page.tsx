@@ -86,10 +86,7 @@ export default function ChatPage() {
     handleSwitchSession,
     handleNewSession,
     handleDeleteSession,
-    systemPrompt,
-    setSystemPrompt,
-    selectedTemplate,
-    setSelectedTemplate
+    web3Prompt
   } = useSessionContext();
 
   const { pdfSessionId } = usePDFSession();
@@ -102,7 +99,6 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('gpt-4o-mini');
-  const [temperature, setTemperature] = useState(0.7);
   const [backendHealthy, setBackendHealthy] = useState(true);
   const [healthChecked, setHealthChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,29 +113,6 @@ export default function ChatPage() {
     { label: "Explain like I'm 5", icon: <LightbulbIcon />, text: "Explain the above like I'm 5." },
     { label: 'Correct grammar', icon: <SpellcheckIcon />, text: 'Correct the grammar in the above.' },
     { label: 'Make concise', icon: <EditNoteIcon />, text: 'Rewrite the above to be more concise.' },
-  ];
-
-  const systemPromptTemplates = [
-    { 
-      name: 'General Assistant', 
-      prompt: 'You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.' 
-    },
-    { 
-      name: 'Code Expert', 
-      prompt: 'You are an expert software developer. Provide detailed code explanations, debugging help, and best practices.' 
-    },
-    { 
-      name: 'Creative Writer', 
-      prompt: 'You are a creative writer. Help with storytelling, content creation, and creative writing projects.' 
-    },
-    { 
-      name: 'Academic Tutor', 
-      prompt: 'You are an academic tutor. Help explain complex concepts, provide educational guidance, and assist with learning.' 
-    },
-    { 
-      name: 'Business Analyst', 
-      prompt: 'You are a business analyst. Help with data analysis, business strategy, and professional insights.' 
-    },
   ];
 
   // On mount, load API key from sessionStorage and listen for changes
@@ -202,9 +175,10 @@ export default function ChatPage() {
       } else {
         // Normal chat mode
         const body: any = {
-          system_prompt: systemPrompt,
+          system_prompt: web3Prompt,
           user_message: userMessage,
           model,
+          temperature: 0.7,
         };
         body.api_key = apiKey;
         response = await axios.post(`${getApiUrl()}/chat`, body);
@@ -245,10 +219,10 @@ export default function ChatPage() {
       if (!apiKey.startsWith('sk-')) throw new Error('Invalid API key');
       // Use the current systemPrompt, model, and temperature
       const body: any = {
-        system_prompt: systemPrompt,
+        system_prompt: web3Prompt,
         user_message: newText,
         model,
-        temperature,
+        temperature: 0.7,
         api_key: apiKey,
       };
       const response = await axios.post(`${getApiUrl()}/chat`, body);

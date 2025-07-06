@@ -55,31 +55,17 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     handleSwitchSession,
     handleNewSession,
     handleDeleteSession,
-    systemPrompt,
-    setSystemPrompt,
-    selectedTemplate,
-    setSelectedTemplate
   } = useSessionContext();
 
   const { pdfSessionId, setPdfSessionId, pdfUploadStatus, setPdfUploadStatus, pdfError, setPdfError } = usePDFSession();
 
   const [model, setModel] = useState('gpt-4o-mini');
-  const [temperature, setTemperature] = useState(0.7);
   const [backendHealthy, setBackendHealthy] = useState(true);
   const [healthChecked, setHealthChecked] = useState(false);
   const [hoveredSession, setHoveredSession] = useState<string | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  const systemPromptTemplates = [
-    { name: '🧑‍💼 General Assistant', prompt: 'You are a knowledgeable, helpful, and friendly AI assistant. Provide clear, accurate, and well-structured responses. Always be concise yet comprehensive, use examples when helpful, and maintain a warm, professional tone. If you\'re unsure about something, acknowledge the limitation and suggest alternatives.' },
-    { name: '💻 Code Expert', prompt: 'You are an expert software developer with deep knowledge of multiple programming languages, frameworks, and best practices. Always provide: 1) Clear, well-commented code examples, 2) Explanations of the logic and approach, 3) Best practices and potential pitfalls, 4) Alternative solutions when applicable. Use proper code formatting and include error handling where relevant. Focus on writing maintainable, efficient, and secure code.' },
-    { name: '✍️ Creative Writer', prompt: 'You are a creative writer and storyteller with expertise in various writing styles and genres. Help users develop compelling narratives, engaging content, and creative ideas. Provide constructive feedback, suggest improvements, and help with character development, plot structure, and writing techniques. Always maintain the user\'s voice while enhancing their creative vision. Be encouraging and supportive of their creative process.' },
-    { name: '🎓 Academic Tutor', prompt: 'You are an experienced academic tutor who excels at breaking down complex concepts into understandable parts. Use the Socratic method when appropriate, provide step-by-step explanations, and encourage critical thinking. Always verify understanding before moving forward, use relevant examples, and connect concepts to real-world applications. Be patient, supportive, and adapt your teaching style to the learner\'s needs.' },
-    { name: '🧠 Logic & Math Solver', prompt: 'You are a step-by-step reasoning engine specializing in logical thinking and mathematical problem-solving. Always: 1) Break down complex problems into smaller, manageable steps, 2) Show your work and reasoning process clearly, 3) Explain each step and why it\'s necessary, 4) Verify your solution and check for errors, 5) Consider alternative approaches when possible. Use clear notation, diagrams when helpful, and ensure your logic is sound and well-explained.' },
-    { name: '🧾 Instruction Follower', prompt: 'You are a precise and reliable assistant that follows user instructions exactly as specified. Your core principles: 1) Execute instructions precisely without deviation or interpretation unless clarification is needed, 2) Ask for clarification if instructions are ambiguous, 3) Complete tasks thoroughly and completely, 4) Maintain consistency in approach and output format, 5) Confirm completion and provide clear deliverables. Be methodical, thorough, and dependable in all tasks.' },
-  ];
 
   // Check backend health
   useEffect(() => {
@@ -96,33 +82,6 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, [healthChecked]);
-
-  const handleTemplateSelect = (templateName: string) => {
-    const template = systemPromptTemplates.find(t => t.name === templateName);
-    if (template) {
-      setSystemPrompt(template.prompt);
-      setSelectedTemplate(templateName);
-    } else if (templateName === 'Custom') {
-      setSystemPrompt('');
-      setSelectedTemplate('Custom');
-    }
-  };
-
-  // General Assistant default prompt
-  const generalAssistantPrompt = 'You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.';
-
-  // On mount and when template changes, sync prompt if not custom
-  useEffect(() => {
-    if (selectedTemplate === 'General Assistant' && (systemPrompt === '' || systemPrompt === generalAssistantPrompt)) {
-      setSystemPrompt(generalAssistantPrompt);
-    }
-  }, [selectedTemplate]);
-
-  // When user types in the prompt, keep the selected template but allow customization
-  const handleSystemPromptChange = (value: string) => {
-    setSystemPrompt(value);
-    // Do NOT switch to Custom when editing the prompt
-  };
 
   const handleSettingsClose = () => {
     setSettingsOpen(false);
@@ -151,12 +110,6 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     window.addEventListener('apiKeyCleared', handleApiKeyCleared);
     return () => window.removeEventListener('apiKeyCleared', handleApiKeyCleared);
   }, []);
-
-  useEffect(() => {
-    if (selectedTemplate === 'General Assistant') {
-      setSystemPrompt('You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.');
-    }
-  }, [selectedTemplate]);
 
   // PDF upload handler
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -437,110 +390,6 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
             </Select>
           </FormControl>
         </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ 
-            fontSize: '0.95rem',
-            fontWeight: 600,
-            color: '#111827',
-            marginBottom: '8px'
-          }}>
-            Temperature: {temperature}
-          </div>
-          <Slider
-            value={temperature}
-            onChange={(_, value) => setTemperature(value as number)}
-            min={0}
-            max={2}
-            step={0.1}
-            sx={{
-              color: '#3b82f6',
-              '& .MuiSlider-thumb': {
-                backgroundColor: '#ffffff',
-                border: '2px solid #3b82f6',
-                borderRadius: '4px',
-              },
-              '& .MuiSlider-track': {
-                backgroundColor: '#3b82f6',
-                borderRadius: '4px',
-              },
-              '& .MuiSlider-rail': {
-                backgroundColor: '#e5e7eb',
-                borderRadius: '4px',
-              },
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ 
-            fontSize: '0.95rem',
-            fontWeight: 600,
-            color: '#111827',
-            marginBottom: '8px'
-          }}>
-            System Prompt Template
-          </div>
-          <FormControl fullWidth size="small">
-            <Select
-              value={selectedTemplate}
-              onChange={(e) => handleTemplateSelect(e.target.value)}
-              sx={{
-                backgroundColor: '#ffffff',
-                borderRadius: '6px',
-                color: '#374151',
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#d1d5db',
-                },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#9ca3af',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#3b82f6',
-                },
-              }}
-            >
-              {systemPromptTemplates.map((template) => (
-                <MenuItem key={template.name} value={template.name}>
-                  {template.name}
-                </MenuItem>
-              ))}
-              <MenuItem value="Custom">
-                ✏️ Custom
-              </MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-
-        <TextField
-          multiline
-          rows={3}
-          value={systemPrompt}
-          onChange={(e) => handleSystemPromptChange(e.target.value)}
-          placeholder="Enter custom system prompt..."
-          size="small"
-          fullWidth
-          sx={{
-            backgroundColor: '#ffffff',
-            borderRadius: '6px',
-            input: {
-              color: '#374151',
-              '::placeholder': {
-                color: '#9ca3af',
-                opacity: 1,
-              },
-            },
-            '& fieldset': {
-              borderColor: '#d1d5db',
-            },
-            '&:hover fieldset': {
-              borderColor: '#9ca3af',
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: '#3b82f6',
-            },
-          }}
-        />
 
         {!backendHealthy && (
           <div style={{

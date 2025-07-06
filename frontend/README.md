@@ -64,3 +64,11 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## System Prompt
+
+This chatbot is now always powered by a single, hardcoded web3 assistant prompt:
+
+> You are a helpful AI assistant specialized in web3, blockchain, and decentralized technologies. Answer user questions with clear, accurate, and up-to-date information about web3 topics, smart contracts, crypto, and related areas. If you are unsure, say so and suggest where to look for more information.
+
+Users cannot select or edit the system prompt.
