@@ -1,0 +1,44 @@
+# Node.js/Frontend
+node_modules
+.next
+out
+build
+dist
+.cache
+
+# Python/Backend
+__pycache__/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.hypothesis/
+*.egg-info/
+*.egg
+
+# Editor/IDE/OS
+.git/
+.idea/
+.vscode/
+.DS_Store
+
+# Logs/Debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Jupyter Notebooks (optional, comment out if needed)
+.ipynb_checkpoints/
+
+# Env files (do NOT ignore if you want to deploy with local env, but best practice is to set in Vercel dashboard)
+.env
+.env.* 
