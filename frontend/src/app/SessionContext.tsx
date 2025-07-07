@@ -12,6 +12,13 @@ export interface Session {
   id: string;
   name: string;
   messages: Message[];
+  pdf?: {
+    sessionId: string;
+    filename: string;
+    chunkSize: number;
+    chunkOverlap: number;
+    numChunks: number;
+  };
 }
 
 interface SessionContextType {
@@ -25,6 +32,8 @@ interface SessionContextType {
   handleSwitchSession: (id: string) => void;
   handleNewSession: () => void;
   handleDeleteSession: (id: string) => void;
+  setCurrentSessionPdf: (pdf: Session['pdf']) => void;
+  clearCurrentSessionPdf: () => void;
   web3Prompt: string;
 }
 
@@ -170,6 +179,18 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const setCurrentSessionPdf = (pdf: Session['pdf']) => {
+    setSessions(prev => prev.map(session =>
+      session.id === currentSessionId ? { ...session, pdf } : session
+    ));
+  };
+
+  const clearCurrentSessionPdf = () => {
+    setSessions(prev => prev.map(session =>
+      session.id === currentSessionId ? { ...session, pdf: undefined } : session
+    ));
+  };
+
   return (
     <SessionContext.Provider value={{
       sessions,
@@ -182,6 +203,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       handleSwitchSession,
       handleNewSession,
       handleDeleteSession,
+      setCurrentSessionPdf,
+      clearCurrentSessionPdf,
       web3Prompt
     }}>
       {children}

@@ -43,7 +43,6 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { AppBar, Toolbar, CssBaseline, Container, Menu } from '@mui/material';
 import { useSessionContext } from './SessionContext';
-import { usePDFSession } from './PDFSessionContext';
 
 interface Message {
   text: string;
@@ -57,6 +56,12 @@ interface Session {
   id: string;
   name: string;
   messages: Message[];
+  pdf?: {
+    filename?: string;
+    chunkSize?: number;
+    chunkOverlap?: number;
+    numChunks?: number;
+  };
 }
 
 declare global {
@@ -89,11 +94,8 @@ export default function ChatPage() {
     web3Prompt
   } = useSessionContext();
 
-  const { pdfSessionId, setPdfSessionId, pdfFilename, setPdfFilename, chunkSize, setChunkSize, chunkOverlap, setChunkOverlap, numChunks, setNumChunks, setPdfUploadStatus } = usePDFSession();
-
-  // Find the current session and its messages
   const currentSession = sessions.find(s => s.id === currentSessionId);
-  const messages = currentSession ? currentSession.messages : [];
+  const currentPdf = currentSession?.pdf;
 
   // Local state for chat functionality
   const [input, setInput] = useState('');
@@ -163,10 +165,10 @@ export default function ChatPage() {
     setError(null);
     try {
       let response;
-      if (pdfSessionId) {
+      if (currentPdf) {
         // PDF chat mode
         response = await axios.post(`${getApiUrl()}/pdf_chat`, {
-          session_id: pdfSessionId,
+          session_id: currentPdf.sessionId,
           question: userMessage,
           api_key: apiKey,
           model,
@@ -256,7 +258,7 @@ export default function ChatPage() {
   return (
     <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* PDF Chat Mode Header */}
-      {pdfSessionId && (
+      {currentPdf && (
         <Box sx={{
           display: 'flex',
           alignItems: 'center',
@@ -273,10 +275,10 @@ export default function ChatPage() {
               PDF Chat Mode <span style={{ fontWeight: 400, color: '#64748b', marginLeft: 8, fontSize: '0.95em', border: '1px solid #2563eb', borderRadius: 6, padding: '2px 8px', background: '#f3f6fd' }}>Web3</span>
             </Typography>
             <Typography variant="body2" sx={{ color: '#222', fontWeight: 500 }}>
-              {pdfFilename && <span><b>File:</b> {pdfFilename} </span>}
-              {typeof chunkSize === 'number' && typeof numChunks === 'number' && (
+              {currentPdf.filename && <span><b>File:</b> {currentPdf.filename} </span>}
+              {typeof currentPdf.chunkSize === 'number' && typeof currentPdf.numChunks === 'number' && (
                 <span style={{ marginLeft: 12, color: '#555' }}>
-                  <b>Chunks:</b> {numChunks} (size: {chunkSize}, overlap: {chunkOverlap})
+                  <b>Chunks:</b> {currentPdf.numChunks} (size: {currentPdf.chunkSize}, overlap: {currentPdf.chunkOverlap})
                 </span>
               )}
             </Typography>
@@ -288,7 +290,7 @@ export default function ChatPage() {
         {/* Only the message list is scrollable */}
         <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="sidebar-scroll">
           <List>
-            {messages.map((message, index) => (
+            {sessions.find(s => s.id === currentSessionId)?.messages.map((message, index) => (
               <Fade in timeout={400} key={message.id || index}>
                 <ListItem sx={{ justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end' }}>
                   <Box 

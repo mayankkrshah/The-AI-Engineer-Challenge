@@ -40,7 +40,6 @@ import { getApiUrl } from '../utils/config';
 import axios from 'axios';
 import theme from './theme';
 import { SessionProvider, useSessionContext } from './SessionContext';
-import { PDFSessionProvider, usePDFSession } from './PDFSessionContext';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -55,9 +54,9 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     handleSwitchSession,
     handleNewSession,
     handleDeleteSession,
+    setCurrentSessionPdf,
+    clearCurrentSessionPdf,
   } = useSessionContext();
-
-  const { pdfSessionId, setPdfSessionId, pdfUploadStatus, setPdfUploadStatus, pdfError, setPdfError, pdfFilename, setPdfFilename, chunkSize, setChunkSize, chunkOverlap, setChunkOverlap, numChunks, setNumChunks } = usePDFSession();
 
   const [model, setModel] = useState('gpt-4o-mini');
   const [backendHealthy, setBackendHealthy] = useState(true);
@@ -67,6 +66,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [pdfUploadStatus, setPdfUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Check backend health
   useEffect(() => {
@@ -112,7 +113,11 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     return () => window.removeEventListener('apiKeyCleared', handleApiKeyCleared);
   }, []);
 
-  // PDF upload handler
+  // Find current session's PDF info
+  const currentSession = sessions.find(s => s.id === currentSessionId);
+  const currentPdf = currentSession?.pdf;
+
+  // PDF upload handler (per-session)
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -125,45 +130,32 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
       const response = await axios.post(`${getApiUrl()}/upload_pdf`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setPdfSessionId(response.data.session_id);
-      setPdfFilename(response.data.filename);
-      setChunkSize(response.data.chunk_size);
-      setChunkOverlap(response.data.chunk_overlap);
-      setNumChunks(response.data.num_chunks);
+      setCurrentSessionPdf({
+        sessionId: response.data.session_id,
+        filename: response.data.filename,
+        chunkSize: response.data.chunk_size,
+        chunkOverlap: response.data.chunk_overlap,
+        numChunks: response.data.num_chunks,
+      });
       setPdfUploadStatus('success');
     } catch (err: any) {
       setPdfUploadStatus('error');
       setPdfError(err?.response?.data?.detail || 'PDF upload failed.');
-      setPdfFilename(null);
-      setChunkSize(null);
-      setChunkOverlap(null);
-      setNumChunks(null);
+      clearCurrentSessionPdf();
     } finally {
-      // Reset file input so user can upload the same file again
       if (inputRef.current) inputRef.current.value = '';
     }
   };
 
-  // Listen for PDF removal to reset file input
-  useEffect(() => {
-    if (pdfSessionId === null && inputRef.current) {
-      inputRef.current.value = '';
-    }
-  }, [pdfSessionId]);
-
-  // PDF remove handler (now in Sidebar)
+  // PDF remove handler (per-session)
   const handleRemovePdf = async () => {
-    if (!pdfSessionId) return;
+    if (!currentPdf?.sessionId) return;
     try {
-      await axios.post(`${getApiUrl()}/remove_pdf`, null, { params: { session_id: pdfSessionId } });
+      await axios.post(`${getApiUrl()}/remove_pdf`, null, { params: { session_id: currentPdf.sessionId } });
     } catch (err: any) {
       // Ignore error, always clear state
     } finally {
-      setPdfSessionId(null);
-      setPdfFilename(null);
-      setChunkSize(null);
-      setChunkOverlap(null);
-      setNumChunks(null);
+      clearCurrentSessionPdf();
       setPdfUploadStatus('idle');
       if (inputRef.current) inputRef.current.value = '';
     }
@@ -234,8 +226,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
             {pdfUploadStatus === 'uploading' ? 'Uploading PDF...' : 'Upload PDF'}
           </Button>
         </label>
-        {/* Remove PDF Button (only show in PDF mode) */}
-        {pdfSessionId && (
+        {/* Remove PDF Button (only show if current session has a PDF) */}
+        {currentPdf && (
           <Button
             variant="outlined"
             color="error"
@@ -593,24 +585,22 @@ export default function RootLayout(props: { children: React.ReactNode }) {
       }}>
         <ThemeProvider theme={theme}>
           <SessionProvider>
-            <PDFSessionProvider>
-              <CssBaseline />
-              <div style={{ display: 'flex', height: '100vh', width: '100vw', margin: 0, padding: 0 }}>
-                <Sidebar apiKey={apiKey} setApiKey={setApiKey} />
-                {/* Main Chat Area */}
-                <main style={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  background: '#fff',
-                  borderRadius: '0 0 0 24px',
-                  overflow: 'hidden',
-                  boxShadow: 'none',
-                }}>
-                  {props.children}
-                </main>
-              </div>
-            </PDFSessionProvider>
+            <CssBaseline />
+            <div style={{ display: 'flex', height: '100vh', width: '100vw', margin: 0, padding: 0 }}>
+              <Sidebar apiKey={apiKey} setApiKey={setApiKey} />
+              {/* Main Chat Area */}
+              <main style={{ 
+                flex: 1, 
+                display: 'flex', 
+                flexDirection: 'column',
+                background: '#fff',
+                borderRadius: '0 0 0 24px',
+                overflow: 'hidden',
+                boxShadow: 'none',
+              }}>
+                {props.children}
+              </main>
+            </div>
           </SessionProvider>
         </ThemeProvider>
       </body>
