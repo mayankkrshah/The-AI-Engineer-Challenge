@@ -15,6 +15,7 @@ import uuid
 import tempfile
 import asyncio
 from aimakerspace.openai_utils.embedding import EmbeddingModel
+import re
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -112,17 +113,25 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF processing failed: {str(e)}")
 
+def extract_keywords(text):
+    stopwords = set([
+        'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'for', 'by', 'with', 'as', 'that', 'this', 'it', 'from', 'are', 'be', 'was', 'were', 'has', 'have', 'had', 'but', 'not', 'can', 'will', 'would', 'should', 'could', 'i', 'you', 'he', 'she', 'they', 'we', 'my', 'your', 'his', 'her', 'their', 'our', 'what', 'who', 'how', 'when', 'where', 'why', 'so', 'if', 'than', 'then', 'about', 'into', 'out', 'up', 'down', 'over', 'under', 'again', 'further', 'once', 'here', 'there', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'only', 'own', 'same', 'too', 'very', 's', 't', 'just', 'don', 'now'
+    ])
+    words = re.findall(r'\w+', text.lower())
+    return [w for w in words if w not in stopwords and len(w) > 2]
+
 @app.post("/api/pdf_chat", response_class=PlainTextResponse)
 async def pdf_chat(request: PDFChatRequest):
     session = pdf_sessions.get(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
     vector_db = session['vector_db']
-    chunks = session['chunks']
     k = 4
     relevant_chunks = vector_db.search_by_text(request.question, k=k, return_as_text=True)
-    context = "\n\n".join(relevant_chunks)
-    # Always use the Web3 expert system prompt for PDF chat
+    context = "\n\n".join(relevant_chunks).strip()
+    if not context or context.isspace():
+        return "Sorry, I could not find relevant information in the uploaded PDF for your question. Please ask something related to the document's content."
+    # Compose prompt for OpenAI
     prompt = (
         "You are a professional Web3 expert AI assistant. Use the following PDF context to answer the user's question.\n\n"
         f"Context:\n{context}\n\nQuestion: {request.question}\nAnswer:"
