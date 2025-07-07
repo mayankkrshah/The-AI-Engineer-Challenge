@@ -36,6 +36,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { getApiUrl } from '../utils/config';
 import axios from 'axios';
 import theme from './theme';
@@ -56,6 +57,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     handleDeleteSession,
     setCurrentSessionPdf,
     clearCurrentSessionPdf,
+    setSessions,
   } = useSessionContext();
 
   const [model, setModel] = useState('gpt-4o-mini');
@@ -65,9 +67,6 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [pdfUploadStatus, setPdfUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Check backend health
   useEffect(() => {
@@ -117,12 +116,10 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
   const currentSession = sessions.find(s => s.id === currentSessionId);
   const currentPdf = currentSession?.pdf;
 
-  // PDF upload handler (per-session)
-  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // PDF upload handler for a specific session
+  const handlePdfUploadForSession = async (event: React.ChangeEvent<HTMLInputElement>, sessionId: string) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setPdfUploadStatus('uploading');
-    setPdfError(null);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -130,34 +127,39 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
       const response = await axios.post(`${getApiUrl()}/upload_pdf`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setCurrentSessionPdf({
-        sessionId: response.data.session_id,
-        filename: response.data.filename,
-        chunkSize: response.data.chunk_size,
-        chunkOverlap: response.data.chunk_overlap,
-        numChunks: response.data.num_chunks,
-      });
-      setPdfUploadStatus('success');
+      setSessions(prev => prev.map(session =>
+        session.id === sessionId ? {
+          ...session,
+          pdf: {
+            sessionId: response.data.session_id,
+            filename: response.data.filename,
+            chunkSize: response.data.chunk_size,
+            chunkOverlap: response.data.chunk_overlap,
+            numChunks: response.data.num_chunks,
+          }
+        } : session
+      ));
     } catch (err: any) {
-      setPdfUploadStatus('error');
-      setPdfError(err?.response?.data?.detail || 'PDF upload failed.');
-      clearCurrentSessionPdf();
-    } finally {
-      if (inputRef.current) inputRef.current.value = '';
+      // Optionally show error toast
+      setSessions(prev => prev.map(session =>
+        session.id === sessionId ? { ...session, pdf: undefined } : session
+      ));
+      alert(err?.response?.data?.detail || 'PDF upload failed.');
     }
+    // Always reset the file input value
+    if (event.target) event.target.value = '';
   };
 
-  // PDF remove handler (per-session)
-  const handleRemovePdf = async () => {
-    if (!currentPdf?.sessionId) return;
+  // PDF remove handler for a specific session
+  const handleRemovePdfForSession = async (sessionId: string, pdfSessionId: string) => {
     try {
-      await axios.post(`${getApiUrl()}/remove_pdf`, null, { params: { session_id: currentPdf.sessionId } });
+      await axios.post(`${getApiUrl()}/remove_pdf`, null, { params: { session_id: pdfSessionId } });
     } catch (err: any) {
       // Ignore error, always clear state
     } finally {
-      clearCurrentSessionPdf();
-      setPdfUploadStatus('idle');
-      if (inputRef.current) inputRef.current.value = '';
+      setSessions(prev => prev.map(session =>
+        session.id === sessionId ? { ...session, pdf: undefined } : session
+      ));
     }
   };
 
@@ -205,49 +207,6 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         >
           New Chat
         </Button>
-        {/* PDF Upload Button */}
-        <label htmlFor="pdf-upload-input">
-          <input
-            id="pdf-upload-input"
-            type="file"
-            accept="application/pdf"
-            style={{ display: 'none' }}
-            onChange={handlePdfUpload}
-            ref={inputRef}
-          />
-          <Button
-            variant="outlined"
-            fullWidth
-            component="span"
-            startIcon={<CloudUploadIcon />}
-            sx={{ mt: 2, borderRadius: '12px', textTransform: 'none', fontWeight: 600 }}
-            disabled={pdfUploadStatus === 'uploading'}
-          >
-            {pdfUploadStatus === 'uploading' ? 'Uploading PDF...' : 'Upload PDF'}
-          </Button>
-        </label>
-        {/* Remove PDF Button (only show if current session has a PDF) */}
-        {currentPdf && (
-          <Button
-            variant="outlined"
-            color="error"
-            fullWidth
-            sx={{ mt: 1, borderRadius: '12px', textTransform: 'none', fontWeight: 600 }}
-            onClick={handleRemovePdf}
-          >
-            Remove PDF
-          </Button>
-        )}
-        {pdfUploadStatus === 'success' && (
-          <Alert severity="success" sx={{ mt: 1, borderRadius: '8px' }}>
-            PDF uploaded! You can now chat with it.
-          </Alert>
-        )}
-        {pdfUploadStatus === 'error' && pdfError && (
-          <Alert severity="error" sx={{ mt: 1, borderRadius: '8px' }}>
-            {pdfError}
-          </Alert>
-        )}
       </div>
 
       {/* Sessions List */}
@@ -258,95 +217,126 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         scrollbarWidth: 'thin',
         scrollbarColor: 'rgba(0,0,0,0.08) transparent'
       }}>
-        {sessions.map((session) => (
-          <div
-            key={session.id}
-            style={{
-              background: session.id === currentSessionId 
-                ? '#e8eaf0'
-                : 'transparent',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              marginBottom: '8px',
-              cursor: 'pointer',
-              border: session.id === currentSessionId 
-                ? '1px solid #2563eb'
-                : '1px solid transparent',
-              transition: 'all 0.3s ease',
-              position: 'relative',
-            }}
-            onClick={() => handleSwitchSession(session.id)}
-            onMouseEnter={() => setHoveredSession(session.id)}
-            onMouseLeave={() => setHoveredSession(null)}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ 
-                  fontSize: '0.9rem', 
-                  fontWeight: 600, 
-                  color: '#1a202c',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {session.name}
+        {sessions.map((session) => {
+          const hasPdf = !!session.pdf;
+          return (
+            <div
+              key={session.id}
+              style={{
+                background: session.id === currentSessionId 
+                  ? '#e8eaf0'
+                  : 'transparent',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                marginBottom: '8px',
+                cursor: 'pointer',
+                border: session.id === currentSessionId 
+                  ? '1px solid #2563eb'
+                  : '1px solid transparent',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+              }}
+              onClick={() => handleSwitchSession(session.id)}
+              onMouseEnter={() => setHoveredSession(session.id)}
+              onMouseLeave={() => setHoveredSession(null)}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ 
+                    fontSize: '0.9rem', 
+                    fontWeight: 600, 
+                    color: '#1a202c',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {session.name}
+                    {hasPdf && <PictureAsPdfIcon fontSize="small" sx={{ color: '#dc2626', ml: 1, verticalAlign: 'middle' }} />}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280',
+                    marginTop: '4px'
+                  }}>
+                    {session.messages.length} messages
+                  </div>
                 </div>
-                <div style={{ 
-                  fontSize: '0.75rem', 
-                  color: '#6b7280',
-                  marginTop: '4px'
-                }}>
-                  {session.messages.length} messages
-                </div>
-              </div>
-              {/* Show menu button for all sessions (including the last one) */}
-              {hoveredSession === session.id && (
-                <>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuAnchorEl(e.currentTarget);
-                      setMenuSessionId(session.id);
-                    }}
-                    style={{ 
-                      color: '#6b7280',
-                      padding: '4px'
-                    }}
-                  >
-                    <MoreVertIcon fontSize="small" />
-                  </IconButton>
-                  {/* Menu for this session only */}
-                  <Menu
-                    anchorEl={menuAnchorEl}
-                    open={Boolean(menuAnchorEl) && menuSessionId === session.id}
-                    onClose={() => setMenuAnchorEl(null)}
-                    sx={{
-                      '& .MuiPaper-root': {
-                        backgroundColor: '#fff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '12px',
-                        color: '#222',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                      },
-                    }}
-                  >
-                    <MenuItem 
-                      onClick={() => {
-                        if (menuSessionId) handleDeleteSession(menuSessionId);
-                        setMenuAnchorEl(null);
+                {/* Show menu button for all sessions (including the last one) */}
+                {hoveredSession === session.id && (
+                  <>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuAnchorEl(e.currentTarget);
+                        setMenuSessionId(session.id);
                       }}
-                      style={{ color: '#dc2626' }}
-                      title={sessions.length === 1 ? "Delete this session and create a new fresh one" : "Delete this session"}
+                      style={{ 
+                        color: '#6b7280',
+                        padding: '4px'
+                      }}
                     >
-                      Delete Session
-                    </MenuItem>
-                  </Menu>
-                </>
-              )}
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                    {/* Menu for this session only */}
+                    <Menu
+                      anchorEl={menuAnchorEl}
+                      open={Boolean(menuAnchorEl) && menuSessionId === session.id}
+                      onClose={() => setMenuAnchorEl(null)}
+                      sx={{
+                        '& .MuiPaper-root': {
+                          backgroundColor: '#fff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '12px',
+                          color: '#222',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        },
+                      }}
+                    >
+                      {/* Upload/Remove PDF menu item */}
+                      {!hasPdf ? (
+                        <MenuItem
+                          onClick={e => {
+                            e.stopPropagation();
+                            // Trigger file input click for this session
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'application/pdf';
+                            input.onchange = evt => handlePdfUploadForSession(evt as any, session.id);
+                            input.click();
+                            setMenuAnchorEl(null);
+                          }}
+                        >
+                          Upload PDF
+                        </MenuItem>
+                      ) : (
+                        <MenuItem
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleRemovePdfForSession(session.id, session.pdf!.sessionId);
+                            setMenuAnchorEl(null);
+                          }}
+                        >
+                          Remove PDF
+                        </MenuItem>
+                      )}
+                      <MenuItem 
+                        onClick={() => {
+                          if (menuSessionId) handleDeleteSession(menuSessionId);
+                          setMenuAnchorEl(null);
+                        }}
+                        style={{ color: '#dc2626' }}
+                        title={sessions.length === 1 ? "Delete this session and create a new fresh one" : "Delete this session"}
+                      >
+                        Delete Session
+                      </MenuItem>
+                    </Menu>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Settings Section */}
