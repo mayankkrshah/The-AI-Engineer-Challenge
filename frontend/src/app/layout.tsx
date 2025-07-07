@@ -26,7 +26,9 @@ import {
   DialogActions,
   FormControlLabel,
   Switch,
-  Alert
+  Alert,
+  CircularProgress,
+  Snackbar
 } from '@mui/material';
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -67,6 +69,8 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [uploadingSessionId, setUploadingSessionId] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
   // Check backend health
   useEffect(() => {
@@ -120,6 +124,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
   const handlePdfUploadForSession = async (event: React.ChangeEvent<HTMLInputElement>, sessionId: string) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setUploadingSessionId(sessionId);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -139,15 +144,16 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
           }
         } : session
       ));
+      setSnackbar({ open: true, message: 'PDF uploaded successfully!', severity: 'success' });
     } catch (err: any) {
-      // Optionally show error toast
       setSessions(prev => prev.map(session =>
         session.id === sessionId ? { ...session, pdf: undefined } : session
       ));
-      alert(err?.response?.data?.detail || 'PDF upload failed.');
+      setSnackbar({ open: true, message: err?.response?.data?.detail || 'PDF upload failed.', severity: 'error' });
+    } finally {
+      setUploadingSessionId(null);
+      if (event.target) event.target.value = '';
     }
-    // Always reset the file input value
-    if (event.target) event.target.value = '';
   };
 
   // PDF remove handler for a specific session
@@ -219,6 +225,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
       }}>
         {sessions.map((session) => {
           const hasPdf = !!session.pdf;
+          const isUploading = uploadingSessionId === session.id;
           return (
             <div
               key={session.id}
@@ -252,6 +259,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                   }}>
                     {session.name}
                     {hasPdf && <PictureAsPdfIcon fontSize="small" sx={{ color: '#dc2626', ml: 1, verticalAlign: 'middle' }} />}
+                    {isUploading && <CircularProgress size={16} sx={{ ml: 1, verticalAlign: 'middle' }} />}
                   </div>
                   <div style={{ 
                     fontSize: '0.75rem', 
@@ -296,9 +304,9 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                       {/* Upload/Remove PDF menu item */}
                       {!hasPdf ? (
                         <MenuItem
+                          disabled={isUploading}
                           onClick={e => {
                             e.stopPropagation();
-                            // Trigger file input click for this session
                             const input = document.createElement('input');
                             input.type = 'file';
                             input.accept = 'application/pdf';
@@ -307,16 +315,19 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                             setMenuAnchorEl(null);
                           }}
                         >
+                          {isUploading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                           Upload PDF
                         </MenuItem>
                       ) : (
                         <MenuItem
+                          disabled={isUploading}
                           onClick={e => {
                             e.stopPropagation();
                             handleRemovePdfForSession(session.id, session.pdf!.sessionId);
                             setMenuAnchorEl(null);
                           }}
                         >
+                          {isUploading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                           Remove PDF
                         </MenuItem>
                       )}
@@ -543,6 +554,14 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        ContentProps={{ style: { backgroundColor: snackbar.severity === 'error' ? '#dc2626' : '#2563eb', color: '#fff', fontWeight: 600 } }}
+      />
     </aside>
   );
 }
