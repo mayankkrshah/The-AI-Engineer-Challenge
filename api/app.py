@@ -37,10 +37,9 @@ class ChatRequest(BaseModel):
     model: str = "gpt-3.5-turbo"  # Model selection
     api_key: str  # OpenAI API key for authentication
 
-WEB3_SYSTEM_PROMPT = (
-    "You are a professional Web3 expert AI assistant. "
-    "You help users with questions about blockchain, DeFi, NFTs, smart contracts, security, and the latest Web3 trends. "
-    "Always provide clear, accurate, and up-to-date information."
+# Replace the Web3-specific system prompt with a generic one
+generic_SYSTEM_PROMPT = (
+    "You are a helpful, knowledgeable AI assistant. Answer user questions clearly, accurately, and helpfully on any topic."
 )
 
 # Define the main chat endpoint that handles POST requests
@@ -49,8 +48,8 @@ async def chat(request: ChatRequest):
     try:
         client = OpenAI(api_key=request.api_key)
         messages = []
-        # Always use the Web3 expert system prompt
-        messages.append({"role": "system", "content": WEB3_SYSTEM_PROMPT})
+        # Always use the generic system prompt
+        messages.append({"role": "system", "content": generic_SYSTEM_PROMPT})
         messages.append({"role": "user", "content": request.user_message})
         response = client.chat.completions.create(
             model=request.model,
@@ -133,7 +132,7 @@ async def pdf_chat(request: PDFChatRequest):
         return "Sorry, I could not find relevant information in the uploaded PDF for your question. Please ask something related to the document's content."
     # Compose prompt for OpenAI
     prompt = (
-        "You are a professional Web3 expert AI assistant. Use the following PDF context to answer the user's question.\n\n"
+        "You are a helpful, knowledgeable AI assistant. Use the following context to answer the user's question.\n\n"
         f"Context:\n{context}\n\nQuestion: {request.question}\nAnswer:"
     )
     try:

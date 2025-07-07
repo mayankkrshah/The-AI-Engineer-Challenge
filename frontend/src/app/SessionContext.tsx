@@ -34,7 +34,7 @@ interface SessionContextType {
   handleDeleteSession: (id: string) => void;
   setCurrentSessionPdf: (pdf: Session['pdf']) => void;
   clearCurrentSessionPdf: () => void;
-  web3Prompt: string;
+  genericPrompt: string;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -45,7 +45,7 @@ export const useSessionContext = () => {
   return ctx;
 };
 
-const web3Prompt = 'You are a helpful AI assistant specialized in web3, blockchain, and decentralized technologies. Answer user questions with clear, accurate, and up-to-date information about web3 topics, smart contracts, crypto, and related areas. If you are unsure, say so and suggest where to look for more information.';
+const genericPrompt = 'You are a helpful, knowledgeable AI assistant. Answer user questions clearly, accurately, and helpfully on any topic.';
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -205,7 +205,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       handleDeleteSession,
       setCurrentSessionPdf,
       clearCurrentSessionPdf,
-      web3Prompt
+      genericPrompt
     }}>
       {children}
     </SessionContext.Provider>

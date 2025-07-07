@@ -91,7 +91,7 @@ export default function ChatPage() {
     handleSwitchSession,
     handleNewSession,
     handleDeleteSession,
-    web3Prompt
+    genericPrompt
   } = useSessionContext();
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
@@ -177,7 +177,7 @@ export default function ChatPage() {
       } else {
         // Normal chat mode
         const body: any = {
-          system_prompt: web3Prompt,
+          system_prompt: genericPrompt,
           user_message: userMessage,
           model,
           temperature: 0.7,
@@ -221,7 +221,7 @@ export default function ChatPage() {
       if (!apiKey.startsWith('sk-')) throw new Error('Invalid API key');
       // Use the current systemPrompt, model, and temperature
       const body: any = {
-        system_prompt: web3Prompt,
+        system_prompt: genericPrompt,
         user_message: newText,
         model,
         temperature: 0.7,
@@ -272,7 +272,7 @@ export default function ChatPage() {
         }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Typography variant="subtitle2" sx={{ color: '#2563eb', fontWeight: 700, letterSpacing: 0.5 }}>
-              PDF Chat Mode <span style={{ fontWeight: 400, color: '#64748b', marginLeft: 8, fontSize: '0.95em', border: '1px solid #2563eb', borderRadius: 6, padding: '2px 8px', background: '#f3f6fd' }}>Web3</span>
+              PDF Chat Mode
             </Typography>
             <Typography variant="body2" sx={{ color: '#222', fontWeight: 500 }}>
               {currentPdf.filename && <span><b>File:</b> {currentPdf.filename} </span>}

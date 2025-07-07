@@ -67,8 +67,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## System Prompt
 
-This chatbot is now always powered by a single, hardcoded web3 assistant prompt:
+This chatbot is now always powered by a single, hardcoded assistant prompt:
 
-> You are a helpful AI assistant specialized in web3, blockchain, and decentralized technologies. Answer user questions with clear, accurate, and up-to-date information about web3 topics, smart contracts, crypto, and related areas. If you are unsure, say so and suggest where to look for more information.
+> You are a helpful, knowledgeable AI assistant. Answer user questions clearly, accurately, and helpfully on any topic.
 
 Users cannot select or edit the system prompt.
