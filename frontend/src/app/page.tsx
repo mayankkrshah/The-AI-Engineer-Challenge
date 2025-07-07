@@ -89,7 +89,7 @@ export default function ChatPage() {
     web3Prompt
   } = useSessionContext();
 
-  const { pdfSessionId } = usePDFSession();
+  const { pdfSessionId, setPdfSessionId, pdfFilename, setPdfFilename, chunkSize, setChunkSize, chunkOverlap, setChunkOverlap, numChunks, setNumChunks, setPdfUploadStatus } = usePDFSession();
 
   // Find the current session and its messages
   const currentSession = sessions.find(s => s.id === currentSessionId);
@@ -255,11 +255,33 @@ export default function ChatPage() {
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* PDF Chat Mode Indicator */}
+      {/* PDF Chat Mode Header */}
       {pdfSessionId && (
-        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-          <b>PDF Chat Mode:</b> You are chatting with your uploaded PDF.
-        </Alert>
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          background: '#f4f6fa',
+          border: '1px solid #e0e7ef',
+          borderRadius: 2,
+          px: 3,
+          py: 1.5,
+          mb: 2,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+        }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ color: '#2563eb', fontWeight: 700, letterSpacing: 0.5 }}>
+              PDF Chat Mode <span style={{ fontWeight: 400, color: '#64748b', marginLeft: 8, fontSize: '0.95em', border: '1px solid #2563eb', borderRadius: 6, padding: '2px 8px', background: '#f3f6fd' }}>Web3</span>
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#222', fontWeight: 500 }}>
+              {pdfFilename && <span><b>File:</b> {pdfFilename} </span>}
+              {typeof chunkSize === 'number' && typeof numChunks === 'number' && (
+                <span style={{ marginLeft: 12, color: '#555' }}>
+                  <b>Chunks:</b> {numChunks} (size: {chunkSize}, overlap: {chunkOverlap})
+                </span>
+              )}
+            </Typography>
+          </Box>
+        </Box>
       )}
       {/* Chat messages */}
       <Paper elevation={2} sx={{ flex: 1, mb: 0, p: 2, background: 'rgba(255,255,255,0.98)', borderRadius: 0, boxShadow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>

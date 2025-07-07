@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v13-appRouter';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { 
@@ -57,7 +57,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
     handleDeleteSession,
   } = useSessionContext();
 
-  const { pdfSessionId, setPdfSessionId, pdfUploadStatus, setPdfUploadStatus, pdfError, setPdfError } = usePDFSession();
+  const { pdfSessionId, setPdfSessionId, pdfUploadStatus, setPdfUploadStatus, pdfError, setPdfError, pdfFilename, setPdfFilename, chunkSize, setChunkSize, chunkOverlap, setChunkOverlap, numChunks, setNumChunks } = usePDFSession();
 
   const [model, setModel] = useState('gpt-4o-mini');
   const [backendHealthy, setBackendHealthy] = useState(true);
@@ -66,6 +66,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Check backend health
   useEffect(() => {
@@ -125,10 +126,46 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setPdfSessionId(response.data.session_id);
+      setPdfFilename(response.data.filename);
+      setChunkSize(response.data.chunk_size);
+      setChunkOverlap(response.data.chunk_overlap);
+      setNumChunks(response.data.num_chunks);
       setPdfUploadStatus('success');
     } catch (err: any) {
       setPdfUploadStatus('error');
       setPdfError(err?.response?.data?.detail || 'PDF upload failed.');
+      setPdfFilename(null);
+      setChunkSize(null);
+      setChunkOverlap(null);
+      setNumChunks(null);
+    } finally {
+      // Reset file input so user can upload the same file again
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  // Listen for PDF removal to reset file input
+  useEffect(() => {
+    if (pdfSessionId === null && inputRef.current) {
+      inputRef.current.value = '';
+    }
+  }, [pdfSessionId]);
+
+  // PDF remove handler (now in Sidebar)
+  const handleRemovePdf = async () => {
+    if (!pdfSessionId) return;
+    try {
+      await axios.post(`${getApiUrl()}/remove_pdf`, null, { params: { session_id: pdfSessionId } });
+    } catch (err: any) {
+      // Ignore error, always clear state
+    } finally {
+      setPdfSessionId(null);
+      setPdfFilename(null);
+      setChunkSize(null);
+      setChunkOverlap(null);
+      setNumChunks(null);
+      setPdfUploadStatus('idle');
+      if (inputRef.current) inputRef.current.value = '';
     }
   };
 
@@ -184,6 +221,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
             accept="application/pdf"
             style={{ display: 'none' }}
             onChange={handlePdfUpload}
+            ref={inputRef}
           />
           <Button
             variant="outlined"
@@ -196,6 +234,18 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
             {pdfUploadStatus === 'uploading' ? 'Uploading PDF...' : 'Upload PDF'}
           </Button>
         </label>
+        {/* Remove PDF Button (only show in PDF mode) */}
+        {pdfSessionId && (
+          <Button
+            variant="outlined"
+            color="error"
+            fullWidth
+            sx={{ mt: 1, borderRadius: '12px', textTransform: 'none', fontWeight: 600 }}
+            onClick={handleRemovePdf}
+          >
+            Remove PDF
+          </Button>
+        )}
         {pdfUploadStatus === 'success' && (
           <Alert severity="success" sx={{ mt: 1, borderRadius: '8px' }}>
             PDF uploaded! You can now chat with it.
