@@ -243,16 +243,29 @@ async def file_chat(request: FileChatRequest):
             'summarize', 'summary', 'overview', 'explain the file', 'what is the file',
             'what does the file', 'describe the file', 'tell me about the file',
             'what is this file', 'what is this document', 'explain this file',
-            'explain this document', 'describe this document'
+            'explain this document', 'describe this document', 'list', 'show',
+            'provide', 'give me', 'display', 'print', 'output', 'content',
+            'code', 'text', 'data', 'information', 'details'
         ]
         question_lower = question.lower()
         return any(pattern in question_lower for pattern in broad_patterns)
     
+    # Check if this is a content request (asking for file contents)
+    def is_content_request(question: str) -> bool:
+        content_patterns = [
+            'list', 'show', 'provide', 'give me', 'display', 'print', 'output',
+            'entire code', 'all code', 'full code', 'complete code', 'whole code',
+            'entire content', 'all content', 'full content', 'complete content',
+            'entire file', 'all file', 'full file', 'whole file'
+        ]
+        question_lower = question.lower()
+        return any(pattern in question_lower for pattern in content_patterns)
+    
     # Adaptive retrieval: more chunks for complex questions
     def get_retrieval_count(question: str) -> int:
-        if is_broad_question(question):
-            # For broad questions, return more chunks or all chunks if small
-            return min(len(chunks), 10)  # Cap at 10 chunks for performance
+        if is_broad_question(question) or is_content_request(question):
+            # For broad questions or content requests, return more chunks or all chunks if small
+            return min(len(chunks), 15)  # Increased to 15 chunks for better coverage
         
         word_count = len(question.split())
         question_marks = question.count('?')
@@ -266,17 +279,17 @@ async def file_chat(request: FileChatRequest):
     
     k = get_retrieval_count(request.question)
     
-    # For broad questions, use different search strategy
-    if is_broad_question(request.question):
-        if len(chunks) <= 10:
-            # If small file, use all chunks
+    # For broad questions or content requests, use different search strategy
+    if is_broad_question(request.question) or is_content_request(request.question):
+        if len(chunks) <= 15:
+            # If small/medium file, use all chunks
             relevant_chunks = chunks
         else:
             # For larger files, get diverse chunks using multiple search terms
-            search_terms = ['main', 'important', 'key', 'summary', 'conclusion']
+            search_terms = ['main', 'function', 'class', 'important', 'key', 'contract', 'method']
             all_relevant = []
             for term in search_terms:
-                term_chunks = vector_db.search_by_text(f"{request.question} {term}", k=2, return_as_text=True)
+                term_chunks = vector_db.search_by_text(f"{request.question} {term}", k=3, return_as_text=True)
                 all_relevant.extend(term_chunks)
             # Remove duplicates while preserving order
             seen = set()
@@ -285,8 +298,8 @@ async def file_chat(request: FileChatRequest):
                 if chunk not in seen:
                     seen.add(chunk)
                     relevant_chunks.append(chunk)
-            # If still no good results, fall back to first few chunks
-            if len(relevant_chunks) < 3:
+            # If still no good results, fall back to first chunks
+            if len(relevant_chunks) < 5:
                 relevant_chunks = chunks[:k]
     else:
         # Use normal vector search for specific questions
@@ -300,20 +313,21 @@ async def file_chat(request: FileChatRequest):
     
     # Check for context relevance using keyword overlap
     def is_context_relevant(question: str, context: str, min_relevance_score: float = 0.1) -> bool:
+        # Always allow broad questions and content requests - these are inherently relevant
+        if is_broad_question(question) or is_content_request(question):
+            return True
+        
         # Allow common document operations without strict keyword matching
         common_operations = [
             'summarize', 'summary', 'explain', 'describe', 'what is', 'what are', 
             'tell me about', 'overview', 'main points', 'key points', 'discuss',
             'analyze', 'review', 'outline', 'list', 'show me', 'give me',
-            'everything about', 'all about', 'entire', 'whole', 'complete'
+            'everything about', 'all about', 'entire', 'whole', 'complete',
+            'how does', 'how do', 'what does', 'what do', 'why does', 'why do'
         ]
         
         question_lower = question.lower()
         if any(op in question_lower for op in common_operations):
-            return True
-        
-        # Always allow broad questions
-        if is_broad_question(question):
             return True
             
         question_keywords = set(extract_keywords(question))
