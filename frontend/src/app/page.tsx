@@ -291,8 +291,7 @@ export default function ChatPage() {
               )}
             </Typography>
             <Typography variant="caption" sx={{ color: '#666', mt: 0.5, fontStyle: 'italic' }}>
-              Supports {SUPPORTED_FORMATS.length} formats: {SUPPORTED_FORMATS.slice(0, 8).join(', ')}
-              {SUPPORTED_FORMATS.length > 8 && `, +${SUPPORTED_FORMATS.length - 8} more`}
+              File uploaded successfully! Click "New Chat" to upload a different file.
             </Typography>
           </Box>
         </Box>

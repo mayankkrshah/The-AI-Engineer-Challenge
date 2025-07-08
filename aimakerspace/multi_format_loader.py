@@ -93,24 +93,21 @@ class MultiFormatLoader:
     """
     
     SUPPORTED_FORMATS = {
-        # Document formats
+        # Document formats (modern only)
         'pdf': 'PDF documents',
-        'docx': 'Word documents',
-        'doc': 'Word documents (legacy)',
+        'docx': 'Word documents (modern format only)',
         'rtf': 'Rich Text Format',
         'txt': 'Plain text files',
         'md': 'Markdown files',
         'html': 'HTML files',
         'htm': 'HTML files',
         
-        # Spreadsheet formats
-        'xlsx': 'Excel spreadsheets',
-        'xls': 'Excel spreadsheets (legacy)',
+        # Spreadsheet formats (modern only)
+        'xlsx': 'Excel spreadsheets (modern format only)',
         'csv': 'CSV files',
         
-        # Presentation formats
-        'pptx': 'PowerPoint presentations',
-        'ppt': 'PowerPoint presentations (legacy)',
+        # Presentation formats (modern only)
+        'pptx': 'PowerPoint presentations (modern format only)',
         
         # Data formats
         'json': 'JSON files',
@@ -120,15 +117,24 @@ class MultiFormatLoader:
         
         # Code formats (web3 and general)
         'sol': 'Solidity smart contracts',
+        'py': 'Python files',
         'js': 'JavaScript files',
         'ts': 'TypeScript files',
-        'py': 'Python files',
+        'jsx': 'React JSX files',
+        'tsx': 'React TSX files',
         'rs': 'Rust files',
         'go': 'Go files',
         'css': 'CSS files',
         'scss': 'SCSS files',
-        'sass': 'SASS files',
-        'less': 'Less files',
+        'sass': 'Sass files',
+        'less': 'Less files'
+    }
+    
+    # Legacy formats that are NOT supported
+    UNSUPPORTED_LEGACY_FORMATS = {
+        'doc': 'Legacy Word documents (.doc) are not supported. Please convert to .docx format.',
+        'ppt': 'Legacy PowerPoint presentations (.ppt) are not supported. Please convert to .pptx format.',
+        'xls': 'Legacy Excel spreadsheets (.xls) are not supported. Please convert to .xlsx format.'
     }
     
     def __init__(self, file_path: str):
@@ -179,16 +185,25 @@ class MultiFormatLoader:
     
     def is_supported(self) -> bool:
         """Check if the file format is supported."""
+        # Check for legacy formats first
+        if self.file_extension in self.UNSUPPORTED_LEGACY_FORMATS:
+            return False
         return self.file_extension in self.SUPPORTED_FORMATS
     
     def get_file_info(self) -> Dict[str, str]:
         """Get information about the file."""
+        # Check if it's a legacy format first
+        if self.file_extension in self.UNSUPPORTED_LEGACY_FORMATS:
+            description = self.UNSUPPORTED_LEGACY_FORMATS[self.file_extension]
+        else:
+            description = self.SUPPORTED_FORMATS.get(self.file_extension, 'Unknown format')
+        
         return {
             'filename': os.path.basename(self.file_path),
             'extension': self.file_extension,
             'mime_type': self.mime_type,
             'supported': self.is_supported(),
-            'description': self.SUPPORTED_FORMATS.get(self.file_extension, 'Unknown format')
+            'description': description
         }
     
     def load(self) -> List[str]:
@@ -198,44 +213,63 @@ class MultiFormatLoader:
         Returns:
             List of text chunks extracted from the file
         """
+        # Check for legacy formats first
+        if self.file_extension in self.UNSUPPORTED_LEGACY_FORMATS:
+            error_msg = self.UNSUPPORTED_LEGACY_FORMATS[self.file_extension]
+            raise ValueError(error_msg)
+        
         if not self.is_supported():
-            raise ValueError(f"Unsupported file format: {self.file_extension}")
+            supported_formats = ', '.join(sorted(self.SUPPORTED_FORMATS.keys()))
+            raise ValueError(f"Unsupported file format: {self.file_extension}. Supported formats: {supported_formats}")
+        
+        # Check if file exists and is not empty
+        if not os.path.exists(self.file_path):
+            raise FileNotFoundError(f"File not found: {self.file_path}")
+        
+        if os.path.getsize(self.file_path) == 0:
+            raise ValueError("The uploaded file is empty")
         
         try:
+            # Handle different file types
             if self.file_extension == 'pdf':
                 return self._load_pdf()
-            elif self.file_extension in ['docx', 'doc']:
+            elif self.file_extension == 'docx':
                 return self._load_docx()
-            elif self.file_extension in ['xlsx', 'xls']:
-                return self._load_excel()
-            elif self.file_extension in ['pptx', 'ppt']:
+            elif self.file_extension == 'pptx':
                 return self._load_powerpoint()
+            elif self.file_extension == 'xlsx':
+                return self._load_excel()
+            elif self.file_extension == 'csv':
+                return self._load_csv()
+            elif self.file_extension in ['json']:
+                return self._load_json()
+            elif self.file_extension in ['yaml', 'yml']:
+                return self._load_yaml()
+            elif self.file_extension == 'xml':
+                return self._load_xml()
             elif self.file_extension == 'rtf':
                 return self._load_rtf()
             elif self.file_extension in ['html', 'htm']:
                 return self._load_html()
-            elif self.file_extension == 'md':
-                return self._load_markdown()
-            elif self.file_extension == 'json':
-                return self._load_json()
-            elif self.file_extension in ['yaml', 'yml']:
-                return self._load_yaml()
-            elif self.file_extension == 'csv':
-                return self._load_csv()
-            elif self.file_extension == 'xml':
-                return self._load_xml()
-            else:
-                # Default to text file processing
+            elif self.file_extension in ['txt', 'md', 'py', 'js', 'ts', 'jsx', 'tsx', 'rs', 'go', 'css', 'scss', 'sass', 'less', 'sol']:
                 return self._load_text()
-                
+            else:
+                raise ValueError(f"Unsupported file format: {self.file_extension}")
+        
         except Exception as e:
-            logger.error(f"Error loading file {self.file_path}: {e}")
-            raise
+            logger.error(f"Error loading file {self.file_path}: {str(e)}")
+            # Provide user-friendly error messages
+            if "Package not found" in str(e):
+                raise ValueError(f"The {self.file_extension.upper()} file appears to be corrupted or invalid. Please try uploading a different file.")
+            elif "codec can't decode" in str(e):
+                raise ValueError("Unable to read file - the file may be corrupted or in an unsupported text encoding.")
+            else:
+                raise ValueError(f"Unable to process the {self.file_extension.upper()} file. Please check that the file is valid and not corrupted.")
     
     def _load_pdf(self) -> List[str]:
         """Load PDF files."""
         if not PYPDF2_AVAILABLE:
-            raise ImportError("PyPDF2 is required for PDF processing")
+            raise ValueError("PDF files are not supported in this installation. Please contact support for PDF processing capabilities.")
         
         try:
             reader = PdfReader(self.file_path)
@@ -246,15 +280,20 @@ class MultiFormatLoader:
                 if text.strip():
                     text_chunks.append(f"Page {page_num}:\n{text}")
             
+            if not text_chunks:
+                raise ValueError("No readable text could be extracted from this PDF file. The PDF may be image-based or corrupted.")
+            
             return text_chunks
         except Exception as e:
+            if "PDF files are not supported" in str(e):
+                raise
             logger.error(f"Error reading PDF: {e}")
-            raise
+            raise ValueError(f"Unable to process this PDF file. The file may be corrupted, password-protected, or in an unsupported format.")
     
     def _load_docx(self) -> List[str]:
         """Load Word documents."""
         if not DOCX_AVAILABLE:
-            raise ImportError("python-docx is required for DOCX processing")
+            raise ValueError("Word documents (.docx/.doc) are not supported in this installation. Please contact support for Word document processing capabilities.")
         
         try:
             doc = Document(self.file_path)
@@ -277,15 +316,20 @@ class MultiFormatLoader:
             if current_chunk.strip():
                 text_chunks.append(current_chunk.strip())
             
+            if not text_chunks:
+                raise ValueError("No readable text could be extracted from this Word document. The document may be empty or corrupted.")
+            
             return text_chunks
         except Exception as e:
+            if "Word documents" in str(e):
+                raise
             logger.error(f"Error reading DOCX: {e}")
-            raise
+            raise ValueError(f"Unable to process this Word document. The file may be corrupted or in an unsupported format.")
     
     def _load_excel(self) -> List[str]:
         """Load Excel files."""
         if not EXCEL_AVAILABLE:
-            raise ImportError("openpyxl is required for Excel processing")
+            raise ValueError("Excel files (.xlsx/.xls) are not supported in this installation. Please contact support for Excel processing capabilities.")
         
         try:
             workbook = load_workbook(self.file_path, read_only=True)
@@ -303,15 +347,20 @@ class MultiFormatLoader:
                 if sheet_content.strip():
                     text_chunks.append(sheet_content)
             
+            if not text_chunks:
+                raise ValueError("No readable data could be extracted from this Excel file. The spreadsheet may be empty or corrupted.")
+            
             return text_chunks
         except Exception as e:
+            if "Excel files" in str(e):
+                raise
             logger.error(f"Error reading Excel: {e}")
-            raise
+            raise ValueError(f"Unable to process this Excel file. The file may be corrupted, password-protected, or in an unsupported format.")
     
     def _load_powerpoint(self) -> List[str]:
         """Load PowerPoint presentations."""
         if not PPTX_AVAILABLE:
-            raise ImportError("python-pptx is required for PowerPoint processing")
+            raise ValueError("PowerPoint files (.pptx/.ppt) are not supported in this installation. Please contact support for PowerPoint processing capabilities.")
         
         try:
             prs = Presentation(self.file_path)
@@ -327,24 +376,35 @@ class MultiFormatLoader:
                 if slide_content.strip():
                     text_chunks.append(slide_content)
             
+            if not text_chunks:
+                raise ValueError("No readable text could be extracted from this PowerPoint presentation. The slides may be empty or contain only images.")
+            
             return text_chunks
         except Exception as e:
+            if "PowerPoint files" in str(e):
+                raise
             logger.error(f"Error reading PowerPoint: {e}")
-            raise
+            raise ValueError(f"Unable to process this PowerPoint file. The file may be corrupted or in an unsupported format.")
     
     def _load_rtf(self) -> List[str]:
         """Load RTF files."""
         if not RTF_AVAILABLE:
-            raise ImportError("striprtf is required for RTF processing")
+            raise ValueError("RTF files are not supported in this installation. Please contact support for RTF processing capabilities.")
         
         try:
             with open(self.file_path, 'r', encoding='utf-8') as file:
                 rtf_content = file.read()
                 text = rtf_to_text(rtf_content)
-                return [text] if text.strip() else []
+                
+                if not text.strip():
+                    raise ValueError("No readable text could be extracted from this RTF file. The document may be empty or corrupted.")
+                
+                return [text]
         except Exception as e:
+            if "RTF files are not supported" in str(e):
+                raise
             logger.error(f"Error reading RTF: {e}")
-            raise
+            raise ValueError(f"Unable to process this RTF file. The file may be corrupted or in an unsupported format.")
     
     def _load_html(self) -> List[str]:
         """Load HTML files."""
@@ -494,19 +554,37 @@ class MultiFormatLoader:
     
     def _load_text(self) -> List[str]:
         """Load plain text files (including code files)."""
-        try:
-            encoding = self._detect_encoding(self.file_path)
-            with open(self.file_path, 'r', encoding=encoding) as file:
-                content = file.read()
-                
-                # For code files, add context about the file type
-                if self.file_extension in ['sol', 'js', 'ts', 'py', 'rs', 'go', 'css', 'scss', 'sass', 'less']:
-                    content = f"File type: {self.SUPPORTED_FORMATS[self.file_extension]}\n\n{content}"
-                
-                return [content] if content.strip() else []
-        except Exception as e:
-            logger.error(f"Error reading text file: {e}")
-            raise
+        encodings_to_try = ['utf-8', 'utf-16', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        # Start with detected encoding if available
+        detected_encoding = self._detect_encoding(self.file_path)
+        if detected_encoding and detected_encoding not in encodings_to_try:
+            encodings_to_try.insert(0, detected_encoding)
+        
+        content = None
+        last_error = None
+        
+        for encoding in encodings_to_try:
+            try:
+                with open(self.file_path, 'r', encoding=encoding, errors='ignore') as file:
+                    content = file.read()
+                    break
+            except Exception as e:
+                last_error = e
+                continue
+        
+        if content is None:
+            logger.error(f"Could not read text file with any encoding: {last_error}")
+            raise ValueError(f"Unable to read file - the file may be corrupted or in an unsupported text encoding")
+        
+        if not content.strip():
+            raise ValueError("The file appears to be empty or contains no readable text")
+        
+        # For code files, add context about the file type
+        if self.file_extension in ['sol', 'js', 'ts', 'py', 'rs', 'go', 'css', 'scss', 'sass', 'less']:
+            content = f"File type: {self.SUPPORTED_FORMATS[self.file_extension]}\n\n{content}"
+        
+        return [content]
     
     def _dict_to_text(self, data: dict, indent: int = 0) -> str:
         """Convert dictionary to readable text."""

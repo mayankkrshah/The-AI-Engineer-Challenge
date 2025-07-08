@@ -39,6 +39,16 @@ import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import DescriptionIcon from '@mui/icons-material/Description';
+import ArticleIcon from '@mui/icons-material/Article';
+import TableViewIcon from '@mui/icons-material/TableView';
+import SlideshowIcon from '@mui/icons-material/Slideshow';
+import DataObjectIcon from '@mui/icons-material/DataObject';
+import CodeIcon from '@mui/icons-material/Code';
+import StyleIcon from '@mui/icons-material/Style';
+import WebIcon from '@mui/icons-material/Web';
+import IntegrationInstructionsIcon from '@mui/icons-material/IntegrationInstructions';
 import { getApiUrl } from '../utils/config';
 import axios from 'axios';
 import theme from './theme';
@@ -56,6 +66,53 @@ const SUPPORTED_FORMATS = [
   'YAML', 'XML', 'RTF', 'SOL', 'JS', 'TS', 
   'PY', 'RS', 'GO', 'CSS', 'SCSS'
 ];
+
+// Get appropriate icon based on file type
+function getFileIcon(filename: string) {
+  const extension = filename.split('.').pop()?.toLowerCase();
+  
+  switch (extension) {
+    case 'pdf':
+      return <PictureAsPdfIcon fontSize="small" sx={{ color: '#dc2626' }} />;
+    case 'docx':
+    case 'doc':
+      return <DescriptionIcon fontSize="small" sx={{ color: '#2563eb' }} />;
+    case 'txt':
+    case 'md':
+    case 'rtf':
+      return <ArticleIcon fontSize="small" sx={{ color: '#059669' }} />;
+    case 'xlsx':
+    case 'xls':
+    case 'csv':
+      return <TableViewIcon fontSize="small" sx={{ color: '#dc2626' }} />;
+    case 'pptx':
+    case 'ppt':
+      return <SlideshowIcon fontSize="small" sx={{ color: '#ea580c' }} />;
+    case 'json':
+    case 'yaml':
+    case 'yml':
+    case 'xml':
+      return <DataObjectIcon fontSize="small" sx={{ color: '#7c3aed' }} />;
+    case 'html':
+      return <WebIcon fontSize="small" sx={{ color: '#ea580c' }} />;
+    case 'js':
+    case 'ts':
+      return <IntegrationInstructionsIcon fontSize="small" sx={{ color: '#eab308' }} />;
+    case 'py':
+      return <CodeIcon fontSize="small" sx={{ color: '#3b82f6' }} />;
+    case 'rs':
+      return <CodeIcon fontSize="small" sx={{ color: '#f97316' }} />;
+    case 'go':
+      return <CodeIcon fontSize="small" sx={{ color: '#06b6d4' }} />;
+    case 'css':
+    case 'scss':
+      return <StyleIcon fontSize="small" sx={{ color: '#ec4899' }} />;
+    case 'sol':
+      return <CodeIcon fontSize="small" sx={{ color: '#374151' }} />;
+    default:
+      return <AttachFileIcon fontSize="small" sx={{ color: '#6b7280' }} />;
+  }
+}
 
 // Sidebar component that uses SessionContext
 function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetStateAction<string>> }) {
@@ -266,7 +323,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                     textOverflow: 'ellipsis'
                   }}>
                     {session.name}
-                    {hasPdf && <AttachFileIcon fontSize="small" sx={{ color: '#dc2626', ml: 1, verticalAlign: 'middle' }} />}
+                    {hasPdf && <span style={{ marginLeft: '8px', verticalAlign: 'middle' }}>{getFileIcon(session.pdf!.filename)}</span>}
                     {isUploading && <CircularProgress size={16} sx={{ ml: 1, verticalAlign: 'middle' }} />}
                   </div>
                   <div style={{ 

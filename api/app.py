@@ -122,10 +122,10 @@ async def upload_file(file: UploadFile = File(...), api_key: str = Form(...)):
     file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
     
     if file_extension not in supported_extensions:
-        supported_list = ', '.join(supported_extensions)
+        supported_list = ', '.join([f".{ext}" for ext in sorted(supported_extensions)])
         raise HTTPException(
             status_code=400, 
-            detail=f"Unsupported file format: '{file_extension}'. Supported formats: {supported_list}"
+            detail=f"The file format '.{file_extension}' is not supported. We support these file types: {supported_list}. Please upload a file in one of these formats."
         )
     
     try:
@@ -145,7 +145,7 @@ async def upload_file(file: UploadFile = File(...), api_key: str = Form(...)):
         texts = loader.load()
         
         if not texts or not any(t.strip() for t in texts):
-            raise HTTPException(status_code=400, detail=f"No text could be extracted from the {file_extension.upper()} file.")
+            raise HTTPException(status_code=400, detail=f"No readable text could be extracted from this {file_extension.upper()} file. The file may be empty, corrupted, or contain only images/non-text content.")
         
         # Split texts into chunks
         splitter = CharacterTextSplitter(
@@ -155,7 +155,7 @@ async def upload_file(file: UploadFile = File(...), api_key: str = Form(...)):
         chunks = splitter.split_texts(texts)
         
         if not chunks:
-            raise HTTPException(status_code=400, detail=f"File was processed but no chunks were created.")
+            raise HTTPException(status_code=400, detail=f"The file was processed but couldn't be divided into readable sections. The content may be too short or improperly formatted.")
         
         # Build vector database
         vector_db = VectorDatabase(embedding_model=EmbeddingModel())
@@ -185,11 +185,33 @@ async def upload_file(file: UploadFile = File(...), api_key: str = Form(...)):
             "supported_formats": MultiFormatLoader.get_supported_formats()
         }
         
+    except ValueError as e:
+        # Clean up temporary file in case of error
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        # ValueError contains user-friendly messages from MultiFormatLoader
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError:
+        # Clean up temporary file in case of error
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise HTTPException(status_code=400, detail="The uploaded file could not be found or accessed. Please try uploading again.")
+    except PermissionError:
+        # Clean up temporary file in case of error
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise HTTPException(status_code=400, detail="Unable to access the uploaded file. Please check file permissions and try again.")
+    except MemoryError:
+        # Clean up temporary file in case of error
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise HTTPException(status_code=413, detail="The file is too large to process. Please try uploading a smaller file.")
     except Exception as e:
         # Clean up temporary file in case of error
         if 'tmp_path' in locals() and os.path.exists(tmp_path):
             os.remove(tmp_path)
-        raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
+        logger.error(f"Unexpected error processing file: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while processing your file. Please try again or contact support if the problem persists.")
 
 def extract_keywords(text):
     stopwords = set([
@@ -212,9 +234,26 @@ async def file_chat(request: FileChatRequest):
     vector_db = session['vector_db']
     filename = session['filename']
     file_type = session.get('file_type', 'file')
+    chunks = session['chunks']
+    
+    # Detect broad questions that should see the entire document
+    def is_broad_question(question: str) -> bool:
+        broad_patterns = [
+            'everything about', 'all about', 'entire', 'whole', 'complete',
+            'summarize', 'summary', 'overview', 'explain the file', 'what is the file',
+            'what does the file', 'describe the file', 'tell me about the file',
+            'what is this file', 'what is this document', 'explain this file',
+            'explain this document', 'describe this document'
+        ]
+        question_lower = question.lower()
+        return any(pattern in question_lower for pattern in broad_patterns)
     
     # Adaptive retrieval: more chunks for complex questions
     def get_retrieval_count(question: str) -> int:
+        if is_broad_question(question):
+            # For broad questions, return more chunks or all chunks if small
+            return min(len(chunks), 10)  # Cap at 10 chunks for performance
+        
         word_count = len(question.split())
         question_marks = question.count('?')
         
@@ -226,7 +265,33 @@ async def file_chat(request: FileChatRequest):
         return 4
     
     k = get_retrieval_count(request.question)
-    relevant_chunks = vector_db.search_by_text(request.question, k=k, return_as_text=True)
+    
+    # For broad questions, use different search strategy
+    if is_broad_question(request.question):
+        if len(chunks) <= 10:
+            # If small file, use all chunks
+            relevant_chunks = chunks
+        else:
+            # For larger files, get diverse chunks using multiple search terms
+            search_terms = ['main', 'important', 'key', 'summary', 'conclusion']
+            all_relevant = []
+            for term in search_terms:
+                term_chunks = vector_db.search_by_text(f"{request.question} {term}", k=2, return_as_text=True)
+                all_relevant.extend(term_chunks)
+            # Remove duplicates while preserving order
+            seen = set()
+            relevant_chunks = []
+            for chunk in all_relevant:
+                if chunk not in seen:
+                    seen.add(chunk)
+                    relevant_chunks.append(chunk)
+            # If still no good results, fall back to first few chunks
+            if len(relevant_chunks) < 3:
+                relevant_chunks = chunks[:k]
+    else:
+        # Use normal vector search for specific questions
+        relevant_chunks = vector_db.search_by_text(request.question, k=k, return_as_text=True)
+    
     context = "\n\n".join(relevant_chunks).strip()
     
     # Enhanced context validation
@@ -239,11 +304,16 @@ async def file_chat(request: FileChatRequest):
         common_operations = [
             'summarize', 'summary', 'explain', 'describe', 'what is', 'what are', 
             'tell me about', 'overview', 'main points', 'key points', 'discuss',
-            'analyze', 'review', 'outline', 'list', 'show me', 'give me'
+            'analyze', 'review', 'outline', 'list', 'show me', 'give me',
+            'everything about', 'all about', 'entire', 'whole', 'complete'
         ]
         
         question_lower = question.lower()
         if any(op in question_lower for op in common_operations):
+            return True
+        
+        # Always allow broad questions
+        if is_broad_question(question):
             return True
             
         question_keywords = set(extract_keywords(question))
