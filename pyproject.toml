@@ -18,3 +18,11 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.18",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aimakerspace*"]
+exclude = ["api*", "frontend*", "tests*", ".*"]
+
+[tool.setuptools.package-dir]
+aimakerspace = "aimakerspace"

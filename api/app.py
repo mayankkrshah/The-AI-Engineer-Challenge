@@ -1,8 +1,3 @@
-# Add project root to Python path for imports
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 # Import required FastAPI components for building the API
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -17,6 +12,7 @@ import uuid
 import tempfile
 import asyncio
 import re
+import os
 
 # Try to import aimakerspace modules with error handling
 try:
