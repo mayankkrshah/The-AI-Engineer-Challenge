@@ -118,7 +118,10 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
         texts = loader.load_documents()
         if not texts or not any(t.strip() for t in texts):
             raise HTTPException(status_code=400, detail="No text could be extracted from the PDF.")
-        splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        splitter = CharacterTextSplitter(
+            chunk_size=1500,     # Increased from 1000 for better context
+            chunk_overlap=375    # 25% overlap for better boundary preservation
+        )
         chunks = splitter.split_texts(texts)
         if not chunks:
             raise HTTPException(status_code=400, detail="PDF was extracted but no chunks were created.")
@@ -134,8 +137,8 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
         return {
             "session_id": session_id,
             "filename": file.filename,
-            "chunk_size": 1000,
-            "chunk_overlap": 200,
+            "chunk_size": 1500,      # Updated to reflect new size
+            "chunk_overlap": 375,    # Updated to reflect new overlap
             "num_chunks": len(chunks)
         }
     except Exception as e:
@@ -160,23 +163,84 @@ async def pdf_chat(request: PDFChatRequest):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
     vector_db = session['vector_db']
-    k = 4
+    filename = session['filename']
+    
+    # Adaptive retrieval: more chunks for complex questions
+    def get_retrieval_count(question: str) -> int:
+        word_count = len(question.split())
+        question_marks = question.count('?')
+        
+        # More chunks for complex questions
+        if word_count > 15 or question_marks > 1:
+            return 6
+        elif word_count > 8:
+            return 5
+        return 4
+    
+    k = get_retrieval_count(request.question)
     relevant_chunks = vector_db.search_by_text(request.question, k=k, return_as_text=True)
     context = "\n\n".join(relevant_chunks).strip()
+    
+    # Enhanced context validation
     if not context or context.isspace():
-        return "Sorry, I could not find relevant information in the uploaded PDF for your question. Please ask something related to the document's content."
-    # Compose prompt for OpenAI
+        return f"❌ **Out of Context Question**\n\nI couldn't find any relevant information in the uploaded document '{filename}' to answer your question. Please ask questions related to the content of the document you uploaded."
+    
+    # Check for context relevance using keyword overlap
+    def is_context_relevant(question: str, context: str, min_relevance_score: float = 0.1) -> bool:
+        question_keywords = set(extract_keywords(question))
+        context_keywords = set(extract_keywords(context))
+        
+        if not question_keywords:
+            return True  # If no keywords extracted, allow the question
+            
+        # Calculate keyword overlap ratio
+        overlap = len(question_keywords.intersection(context_keywords))
+        relevance_score = overlap / len(question_keywords)
+        
+        return relevance_score >= min_relevance_score
+    
+    # Validate if the retrieved context is actually relevant to the question
+    if not is_context_relevant(request.question, context):
+        return f"❌ **Out of Context Question**\n\nYour question appears to be outside the scope of the uploaded document '{filename}'. The document doesn't contain information relevant to your query. Please ask questions about the content that's actually in the document."
+    
+    # Enhanced prompt with explicit context boundary instruction
     prompt = (
-        "You are a helpful, knowledgeable AI assistant. Use the following context to answer the user's question.\n\n"
-        f"Context:\n{context}\n\nQuestion: {request.question}\nAnswer:"
+        f"You are a helpful AI assistant answering questions ONLY based on the provided context from the document '{filename}'. "
+        "IMPORTANT INSTRUCTIONS:\n"
+        "- If the question cannot be answered using the provided context, respond with: 'This question is outside the scope of the uploaded document.'\n"
+        "- Only use information from the context below to answer questions\n"
+        "- Do not use external knowledge or make assumptions beyond what's in the context\n"
+        "- If the context doesn't contain enough information to fully answer the question, say so explicitly\n\n"
+        f"Context from document '{filename}':\n{context}\n\n"
+        f"Question: {request.question}\n\n"
+        "Answer based ONLY on the provided context:"
     )
+    
     try:
         client = OpenAI(api_key=request.api_key)
         response = client.chat.completions.create(
             model=request.model,
-            messages=[{"role": "system", "content": prompt}]
+            messages=[{"role": "system", "content": prompt}],
+            temperature=0.1  # Lower temperature for more focused, context-based responses
         )
-        return response.choices[0].message.content
+        
+        answer = response.choices[0].message.content
+        
+        # Post-process response to catch if the model still tries to answer out-of-context
+        out_of_context_indicators = [
+            "this question is outside the scope",
+            "outside the scope of the uploaded document",
+            "not enough information in the context",
+            "cannot be answered using the provided context",
+            "the context doesn't contain",
+            "based on the provided context, i cannot"
+        ]
+        
+        if any(indicator in answer.lower() for indicator in out_of_context_indicators):
+            return f"❌ **Out of Context Question**\n\nYour question cannot be answered based on the content of the uploaded document '{filename}'. Please ask questions that relate to the information actually contained in the document."
+        
+        return answer
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAG chat failed: {str(e)}")
 
