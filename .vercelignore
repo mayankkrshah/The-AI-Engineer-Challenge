@@ -41,4 +41,11 @@ yarn-error.log*
 
 # Env files (do NOT ignore if you want to deploy with local env, but best practice is to set in Vercel dashboard)
 .env
-.env.* 
+.env.*
+
+# AI Challenge directories (these are huge and not needed for deployment)
+.ai-challenge/
+**/.ai-challenge/
+
+# Duplicate directories
+aimakerspace 2/ 
