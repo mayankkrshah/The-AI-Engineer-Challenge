@@ -1,56 +1,58 @@
-# MERGE INSTRUCTIONS: PDF Upload & Chat Feature
+# 🚀 Merge Instructions - Feature Branch: s03-assignment-activity-2
 
-## Feature Summary
-This branch implements the following:
-- PDF upload button in the sidebar (frontend)
-- Uploads PDF to backend, which indexes it using the `aimakerspace` library
-- Enables chat with the PDF using a simple RAG (Retrieval-Augmented Generation) system
-- All code is well-documented and follows branch development best practices
+## 📝 Summary of Changes
 
----
+This branch implements **Session 3: End-to-End RAG** assignment with the following key changes:
 
-## How to Merge This Feature Branch to `main`
+- **✅ PDF Upload & RAG System**: Added endpoints for PDF upload, indexing, and chat functionality
+- **✅ aimakerspace Library Integration**: Session 3 library properly integrated for RAG pipeline  
+- **✅ Clean Architecture**: Removed path hacks, implemented proper imports and error handling
+- **✅ Modern Dependencies**: Updated pyproject.toml, removed requirements.txt
+- **✅ Production Ready**: Robust error handling for reliable deployment
 
-### 1. **Via GitHub Pull Request (Recommended)**
-1. Push your branch to GitHub (if not already):
-   ```sh
-git push origin feature/s03-assignment-pdf-flow
-   ```
-2. Go to your repository on GitHub.
-3. Click "Compare & pull request" for `feature/s03-assignment-pdf-flow`.
-4. Review the changes, add a description, and create the pull request.
-5. After review, click "Merge pull request".
+### Key Files Modified
+- `api/app.py` - Added RAG endpoints and clean import handling
+- `pyproject.toml` - Updated dependencies and package configuration
+- `aimakerspace/` - Complete Session 3 library integration
 
-### 2. **Via GitHub CLI**
-1. Make sure you have the GitHub CLI installed (`gh`).
-2. Push your branch (if not already):
-   ```sh
-git push origin feature/s03-assignment-pdf-flow
-   ```
-3. Create a pull request from the CLI:
-   ```sh
-gh pr create --base main --head feature/s03-assignment-pdf-flow --fill
-   ```
-4. Merge the pull request from the CLI:
-   ```sh
-gh pr merge --merge
-   ```
+## 🔄 How to Merge
 
----
+### Option 1: GitHub PR (Recommended)
+1. Go to GitHub: https://github.com/mayankkrshah/The-AI-Engineer-Challenge
+2. Click "Compare & pull request" for `feature/s03-assignment-activity-2`
+3. Add title: "🚀 Session 3: End-to-End RAG Implementation"
+4. Review changes and merge
 
-## After Merging
-- Pull the latest `main` branch to your local machine:
-  ```sh
+### Option 2: GitHub CLI
+```bash
+gh pr create \
+  --title "🚀 Session 3: End-to-End RAG Implementation" \
+  --body "Session 3 Assignment: PDF upload, RAG pipeline, and production-ready deployment" \
+  --base main \
+  --head feature/s03-assignment-activity-2
+
+gh pr merge --squash
+```
+
+### Option 3: Direct Git Merge
+```bash
 git checkout main
 git pull origin main
-  ```
-- Delete the feature branch if desired:
-  ```sh
-git branch -d feature/s03-assignment-pdf-flow
-git push origin --delete feature/s03-assignment-pdf-flow
-  ```
+git merge feature/s03-assignment-activity-2
+git push origin main
+```
+
+## 🚀 Post-Merge Actions
+
+1. **Deploy to Vercel**: 
+   ```bash
+   vercel --prod
+   ```
+
+2. **Test RAG functionality**: Upload a PDF and test document Q&A
+
+3. **Verify endpoints**: Check `/api/health`, `/api/upload_pdf`, `/api/pdf_chat`
 
 ---
 
-## Questions?
-If you have any issues or questions, please refer to the project README or contact the code author. 
+**Ready for deployment and Session 3 homework submission! 🎉** 
