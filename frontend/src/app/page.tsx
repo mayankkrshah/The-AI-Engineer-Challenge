@@ -1,6 +1,14 @@
 'use client';
 
 import React, { useState, FormEvent, useEffect } from 'react';
+
+// Supported file formats for display
+const SUPPORTED_FORMATS = [
+  'PDF', 'DOCX', 'DOC', 'TXT', 'MD', 'HTML',
+  'XLSX', 'XLS', 'CSV', 'PPTX', 'PPT', 'JSON', 
+  'YAML', 'XML', 'RTF', 'SOL', 'JS', 'TS', 
+  'PY', 'RS', 'GO', 'CSS', 'SCSS'
+];
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
@@ -166,8 +174,8 @@ export default function ChatPage() {
     try {
       let response;
       if (currentPdf) {
-        // PDF chat mode
-        response = await axios.post(`${getApiUrl()}/pdf_chat`, {
+                  // File chat mode
+        response = await axios.post(`${getApiUrl()}/file_chat`, {
           session_id: currentPdf.sessionId,
           question: userMessage,
           api_key: apiKey,
@@ -257,7 +265,7 @@ export default function ChatPage() {
 
   return (
     <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* PDF Chat Mode Header */}
+                {/* File Chat Mode Header */}
       {currentPdf && (
         <Box sx={{
           display: 'flex',
@@ -272,7 +280,7 @@ export default function ChatPage() {
         }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Typography variant="subtitle2" sx={{ color: '#2563eb', fontWeight: 700, letterSpacing: 0.5 }}>
-              PDF Chat Mode
+              File Chat Mode
             </Typography>
             <Typography variant="body2" sx={{ color: '#222', fontWeight: 500 }}>
               {currentPdf.filename && <span><b>File:</b> {currentPdf.filename} </span>}
@@ -281,6 +289,10 @@ export default function ChatPage() {
                   <b>Chunks:</b> {currentPdf.numChunks} (size: {currentPdf.chunkSize}, overlap: {currentPdf.chunkOverlap})
                 </span>
               )}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#666', mt: 0.5, fontStyle: 'italic' }}>
+              Supports {SUPPORTED_FORMATS.length} formats: {SUPPORTED_FORMATS.slice(0, 8).join(', ')}
+              {SUPPORTED_FORMATS.length > 8 && `, +${SUPPORTED_FORMATS.length - 8} more`}
             </Typography>
           </Box>
         </Box>

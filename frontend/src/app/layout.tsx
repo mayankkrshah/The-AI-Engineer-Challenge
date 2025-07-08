@@ -38,7 +38,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { getApiUrl } from '../utils/config';
 import axios from 'axios';
 import theme from './theme';
@@ -48,6 +48,14 @@ const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
+
+// Supported file formats for display
+const SUPPORTED_FORMATS = [
+  'PDF', 'DOCX', 'DOC', 'TXT', 'MD', 'HTML',
+  'XLSX', 'XLS', 'CSV', 'PPTX', 'PPT', 'JSON', 
+  'YAML', 'XML', 'RTF', 'SOL', 'JS', 'TS', 
+  'PY', 'RS', 'GO', 'CSS', 'SCSS'
+];
 
 // Sidebar component that uses SessionContext
 function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetStateAction<string>> }) {
@@ -129,7 +137,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
       const formData = new FormData();
       formData.append('file', file);
       formData.append('api_key', props.apiKey);
-      const response = await axios.post(`${getApiUrl()}/upload_pdf`, formData, {
+      const response = await axios.post(`${getApiUrl()}/upload_file`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setSessions(prev => prev.map(session =>
@@ -144,12 +152,12 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
           }
         } : session
       ));
-      setSnackbar({ open: true, message: 'PDF uploaded successfully!', severity: 'success' });
+              setSnackbar({ open: true, message: 'File uploaded successfully!', severity: 'success' });
     } catch (err: any) {
       setSessions(prev => prev.map(session =>
         session.id === sessionId ? { ...session, pdf: undefined } : session
       ));
-      setSnackbar({ open: true, message: err?.response?.data?.detail || 'PDF upload failed.', severity: 'error' });
+              setSnackbar({ open: true, message: err?.response?.data?.detail || 'File upload failed.', severity: 'error' });
     } finally {
       setUploadingSessionId(null);
       if (event.target) event.target.value = '';
@@ -159,7 +167,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
   // PDF remove handler for a specific session
   const handleRemovePdfForSession = async (sessionId: string, pdfSessionId: string) => {
     try {
-      await axios.post(`${getApiUrl()}/remove_pdf`, null, { params: { session_id: pdfSessionId } });
+      await axios.post(`${getApiUrl()}/remove_file`, null, { params: { session_id: pdfSessionId } });
     } catch (err: any) {
       // Ignore error, always clear state
     } finally {
@@ -258,7 +266,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                     textOverflow: 'ellipsis'
                   }}>
                     {session.name}
-                    {hasPdf && <PictureAsPdfIcon fontSize="small" sx={{ color: '#dc2626', ml: 1, verticalAlign: 'middle' }} />}
+                    {hasPdf && <AttachFileIcon fontSize="small" sx={{ color: '#dc2626', ml: 1, verticalAlign: 'middle' }} />}
                     {isUploading && <CircularProgress size={16} sx={{ ml: 1, verticalAlign: 'middle' }} />}
                   </div>
                   <div style={{ 
@@ -303,21 +311,23 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                     >
                       {/* Upload/Remove PDF menu item */}
                       {!hasPdf ? (
-                        <MenuItem
-                          disabled={isUploading}
-                          onClick={e => {
-                            e.stopPropagation();
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'application/pdf';
-                            input.onchange = evt => handlePdfUploadForSession(evt as any, session.id);
-                            input.click();
-                            setMenuAnchorEl(null);
-                          }}
-                        >
-                          {isUploading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                          Upload PDF
-                        </MenuItem>
+                        <Tooltip title={`Supported formats: ${SUPPORTED_FORMATS.join(', ')}`} arrow>
+                          <MenuItem
+                            disabled={isUploading}
+                            onClick={e => {
+                              e.stopPropagation();
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = '.pdf,.docx,.doc,.txt,.md,.html,.json,.yaml,.yml,.csv,.xml,.rtf,.xlsx,.xls,.pptx,.ppt,.sol,.js,.ts,.py,.rs,.go,.css,.scss';
+                              input.onchange = evt => handlePdfUploadForSession(evt as any, session.id);
+                              input.click();
+                              setMenuAnchorEl(null);
+                            }}
+                          >
+                            {isUploading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                            Upload File
+                          </MenuItem>
+                        </Tooltip>
                       ) : (
                         <MenuItem
                           disabled={isUploading}
@@ -328,7 +338,7 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                           }}
                         >
                           {isUploading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                          Remove PDF
+                          Remove File
                         </MenuItem>
                       )}
                       <MenuItem 
@@ -359,8 +369,38 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
         borderBottomLeftRadius: '18px',
         borderBottomRightRadius: '18px',
         color: '#374151',
-        minHeight: '220px',
+        minHeight: '280px',
       }}>
+        {/* Supported File Formats Info */}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ 
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            color: '#374151',
+            marginBottom: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <AttachFileIcon fontSize="small" />
+            Supported Formats ({SUPPORTED_FORMATS.length})
+          </div>
+          <div style={{
+            fontSize: '0.7rem',
+            color: '#6b7280',
+            lineHeight: '1.2',
+            maxHeight: '60px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            background: '#f3f4f6',
+            padding: '8px 10px',
+            borderRadius: '6px',
+            border: '1px solid #e5e7eb'
+          }}>
+            {SUPPORTED_FORMATS.join(' • ')}
+          </div>
+        </div>
+
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ 
             fontSize: '0.95rem',

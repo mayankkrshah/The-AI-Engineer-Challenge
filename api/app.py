@@ -13,6 +13,11 @@ import tempfile
 import asyncio
 import re
 import os
+import logging
+
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -34,6 +39,7 @@ try:
     from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
     from aimakerspace.vectordatabase import VectorDatabase
     from aimakerspace.openai_utils.embedding import EmbeddingModel
+    from aimakerspace.multi_format_loader import MultiFormatLoader
     AIMAKERSPACE_AVAILABLE = True
     print("✅ aimakerspace modules imported successfully")
 except ImportError as e:
@@ -82,67 +88,108 @@ def health():
         "import_error": IMPORT_ERROR_MESSAGE if not AIMAKERSPACE_AVAILABLE else None,
         "endpoints": {
             "chat": "✅ Available",
-            "pdf_upload": "✅ Available" if AIMAKERSPACE_AVAILABLE else "❌ Disabled (aimakerspace not available)",
-            "pdf_chat": "✅ Available" if AIMAKERSPACE_AVAILABLE else "❌ Disabled (aimakerspace not available)"
-        }
+            "file_upload": "✅ Available" if AIMAKERSPACE_AVAILABLE else "❌ Disabled (aimakerspace not available)",
+            "file_chat": "✅ Available" if AIMAKERSPACE_AVAILABLE else "❌ Disabled (aimakerspace not available)"
+        },
+        "supported_formats": MultiFormatLoader.get_supported_formats() if AIMAKERSPACE_AVAILABLE else {}
     })
 
-# In-memory store for PDF sessions (session_id -> VectorDatabase)
-pdf_sessions = {}
+# In-memory store for file sessions (session_id -> VectorDatabase)
+file_sessions = {}
 
-class PDFChatRequest(BaseModel):
+class FileChatRequest(BaseModel):
     session_id: str
     question: str
     api_key: str
     model: str = "gpt-3.5-turbo"
 
-@app.post("/api/upload_pdf")
-async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
+@app.post("/api/upload_file")
+async def upload_file(file: UploadFile = File(...), api_key: str = Form(...)):
     """
-    Accepts a PDF file, extracts text, splits into chunks, builds a vector DB, and returns a session ID, filename, and chunk info.
+    Accepts various file formats (PDF, DOCX, TXT, HTML, JSON, YAML, CSV, code files, etc.),
+    extracts text, splits into chunks, builds a vector DB, and returns session info.
     """
     if not AIMAKERSPACE_AVAILABLE:
         raise HTTPException(
             status_code=503, 
-            detail=f"PDF processing functionality is not available. Import error: {IMPORT_ERROR_MESSAGE}"
+            detail=f"File processing functionality is not available. Import error: {IMPORT_ERROR_MESSAGE}"
         )
     
     os.environ["OPENAI_API_KEY"] = api_key
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    
+    # Get supported file extensions
+    supported_extensions = MultiFormatLoader.get_supported_extensions()
+    file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+    
+    if file_extension not in supported_extensions:
+        supported_list = ', '.join(supported_extensions)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file format: '{file_extension}'. Supported formats: {supported_list}"
+        )
+    
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        # Save uploaded file to temporary location
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as tmp:
             tmp.write(await file.read())
             tmp_path = tmp.name
-        loader = PDFLoader(tmp_path)
-        texts = loader.load_documents()
+        
+        # Load file using MultiFormatLoader
+        loader = MultiFormatLoader(tmp_path)
+        
+        # Get file information
+        file_info = loader.get_file_info()
+        logger.info(f"Processing file: {file_info}")
+        
+        # Extract text from file
+        texts = loader.load()
+        
         if not texts or not any(t.strip() for t in texts):
-            raise HTTPException(status_code=400, detail="No text could be extracted from the PDF.")
+            raise HTTPException(status_code=400, detail=f"No text could be extracted from the {file_extension.upper()} file.")
+        
+        # Split texts into chunks
         splitter = CharacterTextSplitter(
             chunk_size=1500,     # Increased from 1000 for better context
             chunk_overlap=375    # 25% overlap for better boundary preservation
         )
         chunks = splitter.split_texts(texts)
+        
         if not chunks:
-            raise HTTPException(status_code=400, detail="PDF was extracted but no chunks were created.")
+            raise HTTPException(status_code=400, detail=f"File was processed but no chunks were created.")
+        
+        # Build vector database
         vector_db = VectorDatabase(embedding_model=EmbeddingModel())
         await vector_db.abuild_from_list(chunks)
+        
+        # Store session
         session_id = str(uuid.uuid4())
-        pdf_sessions[session_id] = {
+        file_sessions[session_id] = {
             'vector_db': vector_db,
             'chunks': chunks,
-            'filename': file.filename
+            'filename': file.filename,
+            'file_type': file_extension,
+            'file_info': file_info
         }
+        
+        # Clean up temporary file
         os.remove(tmp_path)
+        
         return {
             "session_id": session_id,
             "filename": file.filename,
-            "chunk_size": 1500,      # Updated to reflect new size
-            "chunk_overlap": 375,    # Updated to reflect new overlap
-            "num_chunks": len(chunks)
+            "file_type": file_extension,
+            "file_description": file_info['description'],
+            "chunk_size": 1500,
+            "chunk_overlap": 375,
+            "num_chunks": len(chunks),
+            "supported_formats": MultiFormatLoader.get_supported_formats()
         }
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF processing failed: {str(e)}")
+        # Clean up temporary file in case of error
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
 
 def extract_keywords(text):
     stopwords = set([
@@ -151,19 +198,20 @@ def extract_keywords(text):
     words = re.findall(r'\w+', text.lower())
     return [w for w in words if w not in stopwords and len(w) > 2]
 
-@app.post("/api/pdf_chat", response_class=PlainTextResponse)
-async def pdf_chat(request: PDFChatRequest):
+@app.post("/api/file_chat", response_class=PlainTextResponse)
+async def file_chat(request: FileChatRequest):
     if not AIMAKERSPACE_AVAILABLE:
         raise HTTPException(
             status_code=503, 
-            detail=f"PDF chat functionality is not available. Import error: {IMPORT_ERROR_MESSAGE}"
+            detail=f"File chat functionality is not available. Import error: {IMPORT_ERROR_MESSAGE}"
         )
     
-    session = pdf_sessions.get(request.session_id)
+    session = file_sessions.get(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
     vector_db = session['vector_db']
     filename = session['filename']
+    file_type = session.get('file_type', 'file')
     
     # Adaptive retrieval: more chunks for complex questions
     def get_retrieval_count(question: str) -> int:
@@ -183,17 +231,28 @@ async def pdf_chat(request: PDFChatRequest):
     
     # Enhanced context validation
     if not context or context.isspace():
-        return f"❌ **Out of Context Question**\n\nI couldn't find any relevant information in the uploaded document '{filename}' to answer your question. Please ask questions related to the content of the document you uploaded."
+        return f"❌ **Out of Context Question**\n\nI couldn't find any relevant information in the uploaded {file_type.upper()} file '{filename}' to answer your question. Please ask questions related to the content of the file you uploaded."
     
     # Check for context relevance using keyword overlap
     def is_context_relevant(question: str, context: str, min_relevance_score: float = 0.1) -> bool:
+        # Allow common document operations without strict keyword matching
+        common_operations = [
+            'summarize', 'summary', 'explain', 'describe', 'what is', 'what are', 
+            'tell me about', 'overview', 'main points', 'key points', 'discuss',
+            'analyze', 'review', 'outline', 'list', 'show me', 'give me'
+        ]
+        
+        question_lower = question.lower()
+        if any(op in question_lower for op in common_operations):
+            return True
+            
         question_keywords = set(extract_keywords(question))
         context_keywords = set(extract_keywords(context))
         
         if not question_keywords:
             return True  # If no keywords extracted, allow the question
             
-        # Calculate keyword overlap ratio
+        # Calculate keyword overlap ratio with more lenient threshold
         overlap = len(question_keywords.intersection(context_keywords))
         relevance_score = overlap / len(question_keywords)
         
@@ -201,17 +260,17 @@ async def pdf_chat(request: PDFChatRequest):
     
     # Validate if the retrieved context is actually relevant to the question
     if not is_context_relevant(request.question, context):
-        return f"❌ **Out of Context Question**\n\nYour question appears to be outside the scope of the uploaded document '{filename}'. The document doesn't contain information relevant to your query. Please ask questions about the content that's actually in the document."
+        return f"❌ **Out of Context Question**\n\nYour question appears to be outside the scope of the uploaded {file_type.upper()} file '{filename}'. The file doesn't contain information relevant to your query. Please ask questions about the content that's actually in the file."
     
     # Enhanced prompt with explicit context boundary instruction
     prompt = (
-        f"You are a helpful AI assistant answering questions ONLY based on the provided context from the document '{filename}'. "
+        f"You are a helpful AI assistant answering questions ONLY based on the provided context from the {file_type.upper()} file '{filename}'. "
         "IMPORTANT INSTRUCTIONS:\n"
-        "- If the question cannot be answered using the provided context, respond with: 'This question is outside the scope of the uploaded document.'\n"
+        "- If the question cannot be answered using the provided context, respond with: 'This question is outside the scope of the uploaded file.'\n"
         "- Only use information from the context below to answer questions\n"
         "- Do not use external knowledge or make assumptions beyond what's in the context\n"
         "- If the context doesn't contain enough information to fully answer the question, say so explicitly\n\n"
-        f"Context from document '{filename}':\n{context}\n\n"
+        f"Context from {file_type.upper()} file '{filename}':\n{context}\n\n"
         f"Question: {request.question}\n\n"
         "Answer based ONLY on the provided context:"
     )
@@ -229,6 +288,7 @@ async def pdf_chat(request: PDFChatRequest):
         # Post-process response to catch if the model still tries to answer out-of-context
         out_of_context_indicators = [
             "this question is outside the scope",
+            "outside the scope of the uploaded file",
             "outside the scope of the uploaded document",
             "not enough information in the context",
             "cannot be answered using the provided context",
@@ -237,21 +297,21 @@ async def pdf_chat(request: PDFChatRequest):
         ]
         
         if any(indicator in answer.lower() for indicator in out_of_context_indicators):
-            return f"❌ **Out of Context Question**\n\nYour question cannot be answered based on the content of the uploaded document '{filename}'. Please ask questions that relate to the information actually contained in the document."
+            return f"❌ **Out of Context Question**\n\nYour question cannot be answered based on the content of the uploaded {file_type.upper()} file '{filename}'. Please ask questions that relate to the information actually contained in the file."
         
         return answer
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAG chat failed: {str(e)}")
 
-@app.post("/api/remove_pdf")
-def remove_pdf(session_id: str = Query(...)):
-    if session_id in pdf_sessions:
-        del pdf_sessions[session_id]
-        return {"message": "PDF removed from session."}
+@app.post("/api/remove_file")
+def remove_file(session_id: str = Query(...)):
+    if session_id in file_sessions:
+        del file_sessions[session_id]
+        return {"message": "File removed from session."}
     else:
         # Idempotent: return 200 even if not found
-        return {"message": "PDF already removed or session not found."}
+        return {"message": "File already removed or session not found."}
 
 # Entry point for running the application directly
 if __name__ == "__main__":
