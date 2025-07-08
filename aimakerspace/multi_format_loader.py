@@ -93,21 +93,21 @@ class MultiFormatLoader:
     """
     
     SUPPORTED_FORMATS = {
-        # Document formats (modern only)
+        # Document formats (modern XML-based only)
         'pdf': 'PDF documents',
-        'docx': 'Word documents (modern format only)',
+        'docx': 'Word documents (modern format)',
         'rtf': 'Rich Text Format',
         'txt': 'Plain text files',
         'md': 'Markdown files',
         'html': 'HTML files',
         'htm': 'HTML files',
         
-        # Spreadsheet formats (modern only)
-        'xlsx': 'Excel spreadsheets (modern format only)',
+        # Spreadsheet formats (modern XML-based only)
+        'xlsx': 'Excel spreadsheets (modern format)',
         'csv': 'CSV files',
         
-        # Presentation formats (modern only)
-        'pptx': 'PowerPoint presentations (modern format only)',
+        # Presentation formats (modern XML-based only)
+        'pptx': 'PowerPoint presentations (modern format)',
         
         # Data formats
         'json': 'JSON files',
@@ -120,17 +120,13 @@ class MultiFormatLoader:
         'py': 'Python files',
         'js': 'JavaScript files',
         'ts': 'TypeScript files',
-        'jsx': 'React JSX files',
-        'tsx': 'React TSX files',
         'rs': 'Rust files',
         'go': 'Go files',
         'css': 'CSS files',
-        'scss': 'SCSS files',
-        'sass': 'Sass files',
-        'less': 'Less files'
+        'scss': 'SCSS files'
     }
     
-    # Legacy formats that are NOT supported
+    # Legacy formats that are NOT supported (will show clear error messages)
     UNSUPPORTED_LEGACY_FORMATS = {
         'doc': 'Legacy Word documents (.doc) are not supported. Please convert to .docx format.',
         'ppt': 'Legacy PowerPoint presentations (.ppt) are not supported. Please convert to .pptx format.',
@@ -251,7 +247,7 @@ class MultiFormatLoader:
                 return self._load_rtf()
             elif self.file_extension in ['html', 'htm']:
                 return self._load_html()
-            elif self.file_extension in ['txt', 'md', 'py', 'js', 'ts', 'jsx', 'tsx', 'rs', 'go', 'css', 'scss', 'sass', 'less', 'sol']:
+            elif self.file_extension in ['txt', 'md', 'py', 'js', 'ts', 'rs', 'go', 'css', 'scss', 'sol']:
                 return self._load_text()
             else:
                 raise ValueError(f"Unsupported file format: {self.file_extension}")
@@ -581,7 +577,7 @@ class MultiFormatLoader:
             raise ValueError("The file appears to be empty or contains no readable text")
         
         # For code files, add context about the file type
-        if self.file_extension in ['sol', 'js', 'ts', 'py', 'rs', 'go', 'css', 'scss', 'sass', 'less']:
+        if self.file_extension in ['sol', 'js', 'ts', 'py', 'rs', 'go', 'css', 'scss']:
             content = f"File type: {self.SUPPORTED_FORMATS[self.file_extension]}\n\n{content}"
         
         return [content]

@@ -59,11 +59,11 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-// Supported file formats for display
+// Supported file formats for display (only actually supported formats)
 const SUPPORTED_FORMATS = [
-  'PDF', 'DOCX', 'DOC', 'TXT', 'MD', 'HTML',
-  'XLSX', 'XLS', 'CSV', 'PPTX', 'PPT', 'JSON', 
-  'YAML', 'XML', 'RTF', 'SOL', 'JS', 'TS', 
+  'PDF', 'DOCX', 'TXT', 'MD', 'HTML', 'RTF',
+  'XLSX', 'CSV', 'PPTX', 'JSON', 
+  'YAML', 'XML', 'SOL', 'JS', 'TS', 
   'PY', 'RS', 'GO', 'CSS', 'SCSS'
 ];
 
@@ -75,18 +75,15 @@ function getFileIcon(filename: string) {
     case 'pdf':
       return <PictureAsPdfIcon fontSize="small" sx={{ color: '#dc2626' }} />;
     case 'docx':
-    case 'doc':
       return <DescriptionIcon fontSize="small" sx={{ color: '#2563eb' }} />;
     case 'txt':
     case 'md':
     case 'rtf':
       return <ArticleIcon fontSize="small" sx={{ color: '#059669' }} />;
     case 'xlsx':
-    case 'xls':
     case 'csv':
       return <TableViewIcon fontSize="small" sx={{ color: '#dc2626' }} />;
     case 'pptx':
-    case 'ppt':
       return <SlideshowIcon fontSize="small" sx={{ color: '#ea580c' }} />;
     case 'json':
     case 'yaml':
@@ -368,14 +365,28 @@ function Sidebar(props: { apiKey: string; setApiKey: React.Dispatch<React.SetSta
                     >
                       {/* Upload/Remove PDF menu item */}
                       {!hasPdf ? (
-                        <Tooltip title={`Supported formats: ${SUPPORTED_FORMATS.join(', ')}`} arrow>
+                        <Tooltip 
+                          title={`Supported formats: ${SUPPORTED_FORMATS.join(', ')}`} 
+                          arrow 
+                          placement="left"
+                          PopperProps={{
+                            modifiers: [
+                              {
+                                name: 'offset',
+                                options: {
+                                  offset: [0, 8],
+                                },
+                              },
+                            ],
+                          }}
+                        >
                           <MenuItem
                             disabled={isUploading}
                             onClick={e => {
                               e.stopPropagation();
                               const input = document.createElement('input');
                               input.type = 'file';
-                              input.accept = '.pdf,.docx,.doc,.txt,.md,.html,.json,.yaml,.yml,.csv,.xml,.rtf,.xlsx,.xls,.pptx,.ppt,.sol,.js,.ts,.py,.rs,.go,.css,.scss';
+                              input.accept = '.pdf,.docx,.txt,.md,.html,.json,.yaml,.yml,.csv,.xml,.rtf,.xlsx,.pptx,.sol,.js,.ts,.py,.rs,.go,.css,.scss';
                               input.onchange = evt => handlePdfUploadForSession(evt as any, session.id);
                               input.click();
                               setMenuAnchorEl(null);

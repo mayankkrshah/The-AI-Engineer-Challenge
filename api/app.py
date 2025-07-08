@@ -245,7 +245,11 @@ async def file_chat(request: FileChatRequest):
             'what is this file', 'what is this document', 'explain this file',
             'explain this document', 'describe this document', 'list', 'show',
             'provide', 'give me', 'display', 'print', 'output', 'content',
-            'code', 'text', 'data', 'information', 'details'
+            'code', 'text', 'data', 'information', 'details',
+            'what is the file all about', 'what is this file all about',
+            'what is the document all about', 'what is this document all about',
+            'file all about', 'document all about', 'about the file',
+            'about this file', 'about the document', 'about this document'
         ]
         question_lower = question.lower()
         return any(pattern in question_lower for pattern in broad_patterns)
