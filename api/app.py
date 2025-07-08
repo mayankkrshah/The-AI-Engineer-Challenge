@@ -14,21 +14,10 @@ import asyncio
 import re
 import os
 
-# Try to import aimakerspace modules with error handling
-try:
-    from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
-    from aimakerspace.vectordatabase import VectorDatabase
-    from aimakerspace.openai_utils.embedding import EmbeddingModel
-    AIMAKERSPACE_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: Could not import aimakerspace modules: {e}")
-    AIMAKERSPACE_AVAILABLE = False
-
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
 
 # Configure CORS (Cross-Origin Resource Sharing) middleware
-# This allows the API to be accessed from different domains/origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows requests from any origin
@@ -37,8 +26,26 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers in requests
 )
 
+# Try to import aimakerspace modules with detailed error handling
+AIMAKERSPACE_AVAILABLE = False
+IMPORT_ERROR_MESSAGE = ""
+
+try:
+    from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
+    from aimakerspace.vectordatabase import VectorDatabase
+    from aimakerspace.openai_utils.embedding import EmbeddingModel
+    AIMAKERSPACE_AVAILABLE = True
+    print("✅ aimakerspace modules imported successfully")
+except ImportError as e:
+    IMPORT_ERROR_MESSAGE = str(e)
+    print(f"⚠️ Warning: Could not import aimakerspace modules: {e}")
+    print("📝 PDF functionality will be disabled, but basic chat will work")
+except Exception as e:
+    IMPORT_ERROR_MESSAGE = str(e)
+    print(f"❌ Error importing aimakerspace modules: {e}")
+    print("📝 PDF functionality will be disabled, but basic chat will work")
+
 # Define the data model for chat requests using Pydantic
-# This ensures incoming request data is properly validated
 class ChatRequest(BaseModel):
     user_message: str  # Message from the user
     model: str = "gpt-3.5-turbo"  # Model selection
@@ -71,7 +78,13 @@ async def chat(request: ChatRequest):
 def health():
     return JSONResponse(content={
         "status": "ok",
-        "aimakerspace_available": AIMAKERSPACE_AVAILABLE
+        "aimakerspace_available": AIMAKERSPACE_AVAILABLE,
+        "import_error": IMPORT_ERROR_MESSAGE if not AIMAKERSPACE_AVAILABLE else None,
+        "endpoints": {
+            "chat": "✅ Available",
+            "pdf_upload": "✅ Available" if AIMAKERSPACE_AVAILABLE else "❌ Disabled (aimakerspace not available)",
+            "pdf_chat": "✅ Available" if AIMAKERSPACE_AVAILABLE else "❌ Disabled (aimakerspace not available)"
+        }
     })
 
 # In-memory store for PDF sessions (session_id -> VectorDatabase)
@@ -89,7 +102,10 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
     Accepts a PDF file, extracts text, splits into chunks, builds a vector DB, and returns a session ID, filename, and chunk info.
     """
     if not AIMAKERSPACE_AVAILABLE:
-        raise HTTPException(status_code=500, detail="PDF processing functionality is not available due to missing dependencies.")
+        raise HTTPException(
+            status_code=503, 
+            detail=f"PDF processing functionality is not available. Import error: {IMPORT_ERROR_MESSAGE}"
+        )
     
     os.environ["OPENAI_API_KEY"] = api_key
     if not file.filename.lower().endswith('.pdf'):
@@ -135,7 +151,10 @@ def extract_keywords(text):
 @app.post("/api/pdf_chat", response_class=PlainTextResponse)
 async def pdf_chat(request: PDFChatRequest):
     if not AIMAKERSPACE_AVAILABLE:
-        raise HTTPException(status_code=500, detail="PDF chat functionality is not available due to missing dependencies.")
+        raise HTTPException(
+            status_code=503, 
+            detail=f"PDF chat functionality is not available. Import error: {IMPORT_ERROR_MESSAGE}"
+        )
     
     session = pdf_sessions.get(request.session_id)
     if not session:
