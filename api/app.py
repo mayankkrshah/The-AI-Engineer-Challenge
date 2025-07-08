@@ -1,3 +1,8 @@
+# Add project root to Python path for imports
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Import required FastAPI components for building the API
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -6,16 +11,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 # Import OpenAI client for interacting with OpenAI's API
 from openai import OpenAI
-import os
 from typing import Optional, List
 from time import time
-from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
-from aimakerspace.vectordatabase import VectorDatabase
 import uuid
 import tempfile
 import asyncio
-from aimakerspace.openai_utils.embedding import EmbeddingModel
 import re
+
+# Try to import aimakerspace modules with error handling
+try:
+    from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
+    from aimakerspace.vectordatabase import VectorDatabase
+    from aimakerspace.openai_utils.embedding import EmbeddingModel
+    AIMAKERSPACE_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Could not import aimakerspace modules: {e}")
+    AIMAKERSPACE_AVAILABLE = False
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -62,7 +73,10 @@ async def chat(request: ChatRequest):
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
 def health():
-    return JSONResponse(content={"status": "ok"})
+    return JSONResponse(content={
+        "status": "ok",
+        "aimakerspace_available": AIMAKERSPACE_AVAILABLE
+    })
 
 # In-memory store for PDF sessions (session_id -> VectorDatabase)
 pdf_sessions = {}
@@ -78,6 +92,9 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(...)):
     """
     Accepts a PDF file, extracts text, splits into chunks, builds a vector DB, and returns a session ID, filename, and chunk info.
     """
+    if not AIMAKERSPACE_AVAILABLE:
+        raise HTTPException(status_code=500, detail="PDF processing functionality is not available due to missing dependencies.")
+    
     os.environ["OPENAI_API_KEY"] = api_key
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -121,6 +138,9 @@ def extract_keywords(text):
 
 @app.post("/api/pdf_chat", response_class=PlainTextResponse)
 async def pdf_chat(request: PDFChatRequest):
+    if not AIMAKERSPACE_AVAILABLE:
+        raise HTTPException(status_code=500, detail="PDF chat functionality is not available due to missing dependencies.")
+    
     session = pdf_sessions.get(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
